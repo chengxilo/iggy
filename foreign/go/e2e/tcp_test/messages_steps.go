@@ -37,11 +37,9 @@ func createDefaultMessageHeaders() map[iggcon.HeaderKey]iggcon.HeaderValue {
 
 func createDefaultMessages() []iggcon.IggyMessage {
 	headers := createDefaultMessageHeaders()
-	messages := []iggcon.IggyMessage{
-		iggcon.NewIggyMessageWithHeaders(uuid.New(), []byte(createRandomString(256)), headers),
-		iggcon.NewIggyMessageWithHeaders(uuid.New(), []byte(createRandomString(256)), headers),
-	}
-
+	msg1, _ := iggcon.NewIggyMessage([]byte(createRandomString(256)), iggcon.WithID(uuid.New()), iggcon.WithUserHeaders(headers))
+	msg2, _ := iggcon.NewIggyMessage([]byte(createRandomString(256)), iggcon.WithID(uuid.New()), iggcon.WithUserHeaders(headers))
+	messages := []iggcon.IggyMessage{msg1, msg2}
 	return messages
 }
 

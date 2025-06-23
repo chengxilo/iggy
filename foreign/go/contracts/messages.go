@@ -17,8 +17,14 @@
 
 package iggcon
 
-import (
-	"github.com/google/uuid"
+import "errors"
+
+const (
+	// MaxPayloadSize Maximum allowed size in bytes for a message payload.
+	MaxPayloadSize = 10 * 1000 * 1000
+
+	// MaxUserHeadersSize Maximum allowed size in bytes for user-defined headers.
+	MaxUserHeadersSize = 10 * 1000 * 1000
 )
 
 type FetchMessagesRequest struct {
@@ -57,21 +63,50 @@ type IggyMessage struct {
 	UserHeaders []byte
 }
 
-func NewIggyMessage(id uuid.UUID, payload []byte) IggyMessage {
-	return IggyMessage{
-		Header:  NewMessageHeader(id, uint32(len(payload)), 0),
-		Payload: payload,
+type IggyMessageOpt func(message *IggyMessage)
+
+var ErrInvalidMessagePayloadLength = errors.New("invalid message payload length")
+var ErrTooBigUserMessagePayload = errors.New("too big message payload")
+var ErrTooBigUserHeaders = errors.New("too big headers payload")
+
+// NewIggyMessage Creates a new message with customizable parameters.
+func NewIggyMessage(payload []byte, opts ...IggyMessageOpt) (IggyMessage, error) {
+	if len(payload) == 0 {
+		return IggyMessage{}, ErrInvalidMessagePayloadLength
+	}
+
+	if len(payload) > MaxPayloadSize {
+		return IggyMessage{}, ErrTooBigUserMessagePayload
+	}
+
+	header := NewMessageHeader([16]byte{}, uint32(len(payload)), 0)
+	message := IggyMessage{
+		Header:      header,
+		Payload:     payload,
+		UserHeaders: make([]byte, 0),
+	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&message)
+		}
+	}
+	userHeaderLength := len(message.UserHeaders)
+	if userHeaderLength > MaxUserHeadersSize {
+		return IggyMessage{}, ErrTooBigUserHeaders
+	}
+	message.Header.UserHeaderLength = uint32(userHeaderLength)
+	return message, nil
+}
+
+func WithID(id [16]byte) IggyMessageOpt {
+	return func(m *IggyMessage) {
+		m.Header.Id = id
 	}
 }
 
-func NewIggyMessageWithHeaders(id uuid.UUID, payload []byte, userHeaders map[HeaderKey]HeaderValue) IggyMessage {
-	userHeaderBytes := GetHeadersBytes(userHeaders)
-	messageHeader := NewMessageHeader(id, uint32(len(payload)), 0)
-	messageHeader.UserHeaderLength = uint32(len(userHeaderBytes))
-	iggyMessage := IggyMessage{
-		Header:      messageHeader,
-		Payload:     payload,
-		UserHeaders: userHeaderBytes,
+func WithUserHeaders(userHeaders map[HeaderKey]HeaderValue) IggyMessageOpt {
+	return func(m *IggyMessage) {
+		userHeaderBytes := GetHeadersBytes(userHeaders)
+		m.UserHeaders = userHeaderBytes
 	}
-	return iggyMessage
 }
