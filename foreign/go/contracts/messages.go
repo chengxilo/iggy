@@ -17,7 +17,9 @@
 
 package iggcon
 
-import "errors"
+import (
+	ierror "github.com/iggy-rs/iggy-go-client/errors"
+)
 
 const (
 	MaxPayloadSize     = 10 * 1000 * 1000
@@ -62,18 +64,14 @@ type IggyMessage struct {
 
 type IggyMessageOpt func(message *IggyMessage)
 
-var ErrInvalidMessagePayloadLength = errors.New("invalid message payload length")
-var ErrTooBigUserMessagePayload = errors.New("too big message payload")
-var ErrTooBigUserHeaders = errors.New("too big headers payload")
-
 // NewIggyMessage Creates a new message with customizable parameters.
 func NewIggyMessage(payload []byte, opts ...IggyMessageOpt) (IggyMessage, error) {
 	if len(payload) == 0 {
-		return IggyMessage{}, ErrInvalidMessagePayloadLength
+		return IggyMessage{}, ierror.InvalidMessagePayloadLength
 	}
 
 	if len(payload) > MaxPayloadSize {
-		return IggyMessage{}, ErrTooBigUserMessagePayload
+		return IggyMessage{}, ierror.TooBigUserMessagePayload
 	}
 
 	header := NewMessageHeader([16]byte{}, uint32(len(payload)), 0)
@@ -89,7 +87,7 @@ func NewIggyMessage(payload []byte, opts ...IggyMessageOpt) (IggyMessage, error)
 	}
 	userHeaderLength := len(message.UserHeaders)
 	if userHeaderLength > MaxUserHeadersSize {
-		return IggyMessage{}, ErrTooBigUserHeaders
+		return IggyMessage{}, ierror.TooBigUserHeaders
 	}
 	message.Header.UserHeaderLength = uint32(userHeaderLength)
 	return message, nil
