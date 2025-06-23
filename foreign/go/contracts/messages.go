@@ -20,11 +20,8 @@ package iggcon
 import "errors"
 
 const (
-	// MaxPayloadSize Maximum allowed size in bytes for a message payload.
-	MaxPayloadSize = 10 * 1000 * 1000
-
-	// MaxUserHeadersSize Maximum allowed size in bytes for user-defined headers.
-	MaxUserHeadersSize = 10 * 1000 * 1000
+	MaxPayloadSize     = 10 * 1000 * 1000
+	MaxUserHeadersSize = 100 * 1000
 )
 
 type FetchMessagesRequest struct {
