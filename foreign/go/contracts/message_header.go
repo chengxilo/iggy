@@ -25,17 +25,19 @@ import (
 
 const MessageHeaderSize = 8 + 16 + 8 + 8 + 8 + 4 + 4
 
+type MessageID [16]byte
+
 type MessageHeader struct {
-	Checksum         uint64   `json:"checksum"`
-	Id               [16]byte `json:"id"`
-	Offset           uint64   `json:"offset"`
-	Timestamp        uint64   `json:"timestamp"`
-	OriginTimestamp  uint64   `json:"origin_timestamp"`
-	UserHeaderLength uint32   `json:"user_header_length"`
-	PayloadLength    uint32   `json:"payload_length"`
+	Checksum         uint64    `json:"checksum"`
+	Id               MessageID `json:"id"`
+	Offset           uint64    `json:"offset"`
+	Timestamp        uint64    `json:"timestamp"`
+	OriginTimestamp  uint64    `json:"origin_timestamp"`
+	UserHeaderLength uint32    `json:"user_header_length"`
+	PayloadLength    uint32    `json:"payload_length"`
 }
 
-func NewMessageHeader(id [16]byte, payloadLength uint32, userHeaderLength uint32) MessageHeader {
+func NewMessageHeader(id MessageID, payloadLength uint32, userHeaderLength uint32) MessageHeader {
 	return MessageHeader{
 		Id:               id,
 		OriginTimestamp:  uint64(time.Now().UnixMicro()),
@@ -59,7 +61,7 @@ func MessageHeaderFromBytes(data []byte) (*MessageHeader, error) {
 
 	return &MessageHeader{
 		Checksum:         checksum,
-		Id:               [16]byte(id),
+		Id:               MessageID(id),
 		Offset:           offset,
 		Timestamp:        timestamp,
 		OriginTimestamp:  originTimestamp,

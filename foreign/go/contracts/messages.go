@@ -22,7 +22,26 @@ import (
 )
 
 const (
-	MaxPayloadSize     = 10 * 1000 * 1000
+	// MaxPayloadSize is maximum allowed size in bytes for a message payload.
+	//
+	// This constant defines the upper limit for the size of an IggyMessage payload. Attempting to create a message
+	// with a payload larger than this value will result
+	// in an ierror.TooBigUserMessagePayload error.
+	//
+	//  Constraints
+	//  - Minimum payload size: 1 byte (empty payloads are not allowed)
+	//  - Maximum payload size: 10 MB
+	MaxPayloadSize = 10 * 1000 * 1000
+
+	// MaxUserHeadersSize is maximum allowed size in bytes for user-defined headers.
+	//
+	// This constant defines the upper limit for the combined size of all user headers in an IggyMessage. Attempting to
+	// create a message with user headers larger than this value will result in an ierror.TooBigUserHeaders error.
+	//
+	//  Constraints
+	//  - Maximum headers size: 100 KB
+	//  - Each individual header key is limited to 255 bytes
+	//  - Each individual header value is limited to 255 bytes
 	MaxUserHeadersSize = 100 * 1000
 )
 
@@ -74,7 +93,7 @@ func NewIggyMessage(payload []byte, opts ...IggyMessageOpt) (IggyMessage, error)
 		return IggyMessage{}, ierror.TooBigUserMessagePayload
 	}
 
-	header := NewMessageHeader([16]byte{}, uint32(len(payload)), 0)
+	header := NewMessageHeader(MessageID{}, uint32(len(payload)), 0)
 	message := IggyMessage{
 		Header:      header,
 		Payload:     payload,

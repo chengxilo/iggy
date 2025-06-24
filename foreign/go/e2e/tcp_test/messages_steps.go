@@ -39,8 +39,7 @@ func createDefaultMessages() []iggcon.IggyMessage {
 	headers := createDefaultMessageHeaders()
 	msg1, _ := iggcon.NewIggyMessage([]byte(createRandomString(256)), iggcon.WithID(uuid.New()), iggcon.WithUserHeaders(headers))
 	msg2, _ := iggcon.NewIggyMessage([]byte(createRandomString(256)), iggcon.WithID(uuid.New()), iggcon.WithUserHeaders(headers))
-	messages := []iggcon.IggyMessage{msg1, msg2}
-	return messages
+	return []iggcon.IggyMessage{msg1, msg2}
 }
 
 func itShouldSuccessfullyPublishMessages(streamId int, topicId int, messages []iggcon.IggyMessage, client iggy.MessageStream) {
