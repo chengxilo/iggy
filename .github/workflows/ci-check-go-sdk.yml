@@ -67,6 +67,17 @@ jobs:
       - name: Docker Compose Up
         run: docker compose up -d
 
+      # Wait until the Iggy server is ready; otherwise, E2E tests may fail due to connection issues.
+      - name: Wait For Iggy To Be Ready
+        run: |
+          echo "Waiting for 127.0.0.1:8090..."
+          for i in {1..60}; do
+            nc -z 127.0.0.1 8090 && echo "Up!" && exit 0
+            echo "Waiting..."
+            sleep 2
+          done
+          echo "Timeout waiting for port 8090" && exit 1
+
       # Install ginkgo for E2E test.
       - name: Install Ginkgo CLI
         run: go install github.com/onsi/ginkgo/v2/ginkgo@latest
