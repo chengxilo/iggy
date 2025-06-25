@@ -64,6 +64,9 @@ jobs:
         working-directory: foreign/go
         run: go test ./...
 
+      - name: Docker Compose Up
+        run: docker compose up -d
+
       # Install ginkgo for E2E test.
       - name: Install Ginkgo CLI
         run: go install github.com/onsi/ginkgo/v2/ginkgo@latest
@@ -71,3 +74,7 @@ jobs:
       - name: E2E Test
         working-directory: foreign/go
         run: sh ./scripts/run_tcp_e2e.sh
+
+      - name: Docker Compose Down
+        if: always()
+        run: docker compose down
