@@ -59,6 +59,7 @@ jobs:
     outputs:
       trigger-rust: ${{ steps.changed-files.outputs.RUST_FILES_CHANGED }}
       trigger-shell: ${{ steps.changed-files.outputs.SHELL_FILES_CHANGED }}
+      trigger-go-sdk: ${{ steps.changed-files.outputs.GO-SDK_FILES_CHANGED}}
       trigger-java-sdk: ${{ steps.changed-files.outputs.JAVA-SDK_FILES_CHANGED }}
       trigger-python-sdk: ${{ steps.changed-files.outputs.PYTHON-SDK_FILES_CHANGED }}
       trigger-node-sdk: ${{ steps.changed-files.outputs.NODE-SDK_FILES_CHANGED }}
@@ -127,6 +128,12 @@ jobs:
     if: ${{ needs.pr-file-changes.outputs.trigger-shell == 'true' }}
     uses: ./.github/workflows/ci-check-shell.yml
 
+  ci-check-go-sdk:
+    name: ci-check-go-sdk
+    needs: pr-file-changes
+    if: ${{ needs.pr-file-changes.outputs.trigger-go-sdk == 'true' }}
+    uses: ./.github/workflows/ci-check-go-sdk.yml
+
   ci-check-java-sdk:
     name: ci-check-java-sdk
     needs: pr-file-changes
@@ -160,6 +167,7 @@ jobs:
       - ci-test-rust
       - ci-compatibility-rust
       - ci-check-shell
+      - ci-check-go-sdk
       - ci-check-java-sdk
       - ci-check-python-sdk
       - ci-check-node-sdk

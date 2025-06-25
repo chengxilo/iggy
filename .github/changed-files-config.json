@@ -27,6 +27,12 @@
     "foreign/java/.*\\.sh",
     ".github/workflows/ci-check-java-sdk.yml"
   ],
+  "go-sdk": [
+    "foreign/go/.*\\.go",
+    "foreign/go/go.mod",
+    "foreign/go/go.sum",
+    ".github/workflows/ci-check-go-sdk.yml"
+  ],
   "python-sdk": [
     "foreign/python/.*\\.py",
     "foreign/python/.*\\.rs",
