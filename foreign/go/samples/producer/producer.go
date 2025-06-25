@@ -43,6 +43,8 @@ func main() {
 		Protocol:    Tcp,
 	}
 
+	print("hello world!")
+
 	messageStream, err := factory.CreateMessageStream(config)
 	if err != nil {
 		panic(err)
