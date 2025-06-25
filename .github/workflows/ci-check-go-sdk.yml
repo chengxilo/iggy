@@ -64,6 +64,11 @@ jobs:
         working-directory: foreign/go
         run: go test ./...
 
+      - name: Set up Docker Compose
+        uses: docker/setup-compose-action@v1
+        with:
+          version: latest
+
       - name: Docker Compose Up
         run: docker compose up -d
 
