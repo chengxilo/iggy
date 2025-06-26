@@ -29,29 +29,33 @@ import (
 	ierror "github.com/apache/iggy/foreign/go/errors"
 )
 
+func GetDefaultTcpClientConfig() ClientConfig {
+	return ClientConfig{
+		Ctx:               context.Background(),
+		ServerAddress:     "127.0.0.1:8090",
+		HeartbeatInterval: time.Second * 5,
+	}
+}
+
+type ClientConfig struct {
+	Ctx               context.Context
+	ServerAddress     string
+	HeartbeatInterval time.Duration
+}
+
 type IggyTcpClient struct {
 	client             *net.TCPConn
 	mtx                sync.Mutex
 	MessageCompression iggcon.IggyMessageCompression
 }
 
-const (
-	InitialBytesLength   = 4
-	ExpectedResponseSize = 8
-	MaxStringLength      = 255
-)
-
-func NewTcpMessageStream(
-	ctx context.Context,
-	url string,
-	compression iggcon.IggyMessageCompression,
-	heartbeatInterval time.Duration,
-) (*IggyTcpClient, error) {
-	addr, err := net.ResolveTCPAddr("tcp", url)
+func NewIggyTcpClient(config ClientConfig) (*IggyTcpClient, error) {
+	addr, err := net.ResolveTCPAddr("tcp", config.ServerAddress)
 	if err != nil {
 		return nil, err
 	}
 
+	ctx := config.Ctx
 	var d = net.Dialer{
 		KeepAlive: -1,
 	}
@@ -60,8 +64,11 @@ func NewTcpMessageStream(
 		return nil, err
 	}
 
-	client := &IggyTcpClient{client: conn.(*net.TCPConn), MessageCompression: compression}
+	client := &IggyTcpClient{
+		client: conn.(*net.TCPConn),
+	}
 
+	heartbeatInterval := config.HeartbeatInterval
 	if heartbeatInterval > 0 {
 		go func() {
 			ticker := time.NewTicker(heartbeatInterval)
@@ -79,6 +86,12 @@ func NewTcpMessageStream(
 
 	return client, nil
 }
+
+const (
+	InitialBytesLength   = 4
+	ExpectedResponseSize = 8
+	MaxStringLength      = 255
+)
 
 func (tms *IggyTcpClient) read(expectedSize int) (int, []byte, error) {
 	var totalRead int

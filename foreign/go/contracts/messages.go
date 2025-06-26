@@ -45,7 +45,7 @@ const (
 	MaxUserHeadersSize = 100 * 1000
 )
 
-type FetchMessagesRequest struct {
+type PollMessageRequest struct {
 	StreamId        Identifier      `json:"streamId"`
 	TopicId         Identifier      `json:"topicId"`
 	Consumer        Consumer        `json:"consumer"`
@@ -55,7 +55,7 @@ type FetchMessagesRequest struct {
 	AutoCommit      bool            `json:"autoCommit"`
 }
 
-type FetchMessagesResponse struct {
+type PollMessageResponse struct {
 	PartitionId   uint32
 	CurrentOffset uint64
 	MessageCount  uint32
@@ -73,6 +73,13 @@ type ReceivedMessage struct {
 	Message       IggyMessage
 	CurrentOffset uint64
 	PartitionId   uint32
+}
+
+type FlushUnsavedBufferRequest struct {
+	StreamId    Identifier `json:"streamId"`
+	TopicId     Identifier `json:"topicId"`
+	PartitionId uint32     `json:"partitionId"`
+	Fsync       bool       `json:"fsync"`
 }
 
 type IggyMessage struct {

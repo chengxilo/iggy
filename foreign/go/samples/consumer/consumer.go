@@ -23,8 +23,8 @@ import (
 	"fmt"
 	"time"
 
-	. "github.com/apache/iggy/foreign/go"
 	. "github.com/apache/iggy/foreign/go/contracts"
+	"github.com/apache/iggy/foreign/go/iggycli"
 	sharedDemoContracts "github.com/apache/iggy/foreign/go/samples/shared"
 )
 
@@ -38,18 +38,11 @@ const (
 )
 
 func main() {
-	factory := &IggyClientFactory{}
-	config := IggyConfiguration{
-		BaseAddress: "127.0.0.1:8090",
-		Protocol:    Tcp,
-	}
-
-	messageStream, err := factory.CreateMessageStream(config)
+	cli, err := iggycli.NewIggyClientBuilder().WithTcp().WithServerAddress("127.0.0.1:8090").Build()
 	if err != nil {
 		panic(err)
 	}
-
-	_, err = messageStream.LogIn(LogInRequest{
+	_, err = cli.LoginUser(LoginUserRequest{
 		Username: "iggy",
 		Password: "iggy",
 	})
@@ -57,20 +50,20 @@ func main() {
 		panic("COULD NOT LOG IN")
 	}
 
-	if err = EnsureInsfrastructureIsInitialized(messageStream); err != nil {
+	if err = EnsureInsfrastructureIsInitialized(cli); err != nil {
 		panic(err)
 	}
 
-	if err := ConsumeMessages(messageStream); err != nil {
+	if err := ConsumeMessages(*cli); err != nil {
 		panic(err)
 	}
 }
 
-func EnsureInsfrastructureIsInitialized(messageStream MessageStream) error {
-	if _, streamErr := messageStream.GetStreamById(GetStreamRequest{
+func EnsureInsfrastructureIsInitialized(cli iggycli.Client) error {
+	if _, streamErr := cli.GetStream(GetStreamRequest{
 		StreamID: NewIdentifier(DefaultStreamId),
 	}); streamErr != nil {
-		streamErr = messageStream.CreateStream(CreateStreamRequest{
+		streamErr = cli.CreateStream(CreateStreamRequest{
 			StreamId: DefaultStreamId,
 			Name:     "Test Producer Stream",
 		})
@@ -84,8 +77,8 @@ func EnsureInsfrastructureIsInitialized(messageStream MessageStream) error {
 
 	fmt.Printf("Stream with ID: %d exists.\n", DefaultStreamId)
 
-	if _, topicErr := messageStream.GetTopicById(NewIdentifier(DefaultStreamId), NewIdentifier(TopicId)); topicErr != nil {
-		topicErr = messageStream.CreateTopic(CreateTopicRequest{
+	if _, topicErr := cli.GetTopic(NewIdentifier(DefaultStreamId), NewIdentifier(TopicId)); topicErr != nil {
+		topicErr = cli.CreateTopic(CreateTopicRequest{
 			TopicId:         TopicId,
 			Name:            "Test Topic From Producer Sample",
 			PartitionsCount: 12,
@@ -104,11 +97,11 @@ func EnsureInsfrastructureIsInitialized(messageStream MessageStream) error {
 	return nil
 }
 
-func ConsumeMessages(messageStream MessageStream) error {
+func ConsumeMessages(messageStream iggycli.IggyClient) error {
 	fmt.Printf("Messages will be polled from stream '%d', topic '%d', partition '%d' with interval %d ms.\n", DefaultStreamId, TopicId, Partition, Interval)
 
 	for {
-		messagesWrapper, err := messageStream.PollMessages(FetchMessagesRequest{
+		messagesWrapper, err := messageStream.PollMessages(PollMessageRequest{
 			Count:           1,
 			StreamId:        NewIdentifier(DefaultStreamId),
 			TopicId:         NewIdentifier(TopicId),

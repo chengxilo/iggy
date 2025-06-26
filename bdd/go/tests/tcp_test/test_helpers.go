@@ -19,42 +19,31 @@ package tcp_test
 
 import (
 	"math/rand"
-	"os"
 	"strings"
 	"time"
 
-	. "github.com/apache/iggy/foreign/go"
 	. "github.com/apache/iggy/foreign/go/contracts"
+	"github.com/apache/iggy/foreign/go/iggycli"
 )
 
-func createAuthorizedConnection() MessageStream {
-	ms := createConnection()
-	_, err := ms.LogIn(LogInRequest{
+func createAuthorizedConnection() iggycli.IggyClient {
+	cli := createClient()
+	_, err := cli.LoginUser(LoginUserRequest{
 		Username: "iggy",
 		Password: "iggy",
 	})
 	if err != nil {
 		panic(err)
 	}
-	return ms
+	return cli
 }
 
-func createConnection() MessageStream {
-	addr := os.Getenv("IGGY_TCP_ADDRESS")
-	if addr == "" {
-		addr = "127.0.0.1:8090"
-	}
-	factory := &IggyClientFactory{}
-	config := IggyConfiguration{
-		BaseAddress: addr,
-		Protocol:    Tcp,
-	}
-
-	ms, err := factory.CreateMessageStream(config)
+func createClient() iggycli.IggyClient {
+	cli, err := iggycli.NewIggyClientBuilder().WithTcp().WithServerAddress("127.0.0.1:8090").Build()
 	if err != nil {
 		panic(err)
 	}
-	return ms
+	return *cli
 }
 
 func createRandomUInt32() uint32 {

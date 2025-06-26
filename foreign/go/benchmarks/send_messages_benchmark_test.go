@@ -24,9 +24,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/apache/iggy/foreign/go"
 	iggcon "github.com/apache/iggy/foreign/go/contracts"
+	"github.com/apache/iggy/foreign/go/iggycli"
+	"github.com/google/uuid"
 )
 
 const (
@@ -40,30 +40,24 @@ const (
 
 func BenchmarkSendMessage(b *testing.B) {
 	rand.New(rand.NewSource(42)) // Seed the random number generator for consistent results
-	streams := make([]iggy.MessageStream, producerCount)
-
-	factory := &iggy.IggyClientFactory{}
-	config := iggcon.IggyConfiguration{
-		BaseAddress: "127.0.0.1:8090",
-		Protocol:    iggcon.Tcp,
-	}
+	clients := make([]iggycli.Client, producerCount)
 
 	for i := 0; i < producerCount; i++ {
-		ms, err := factory.CreateMessageStream(config)
+		cli, err := iggycli.NewIggyClientBuilder().WithTcp().WithServerAddress("127.0.0.1:8090").Build()
 		if err != nil {
 			panic("COULD NOT CREATE MESSAGE STREAM")
 		}
-		_, err = ms.LogIn(iggcon.LogInRequest{
+		_, err = cli.LoginUser(iggcon.LoginUserRequest{
 			Username: "iggy",
 			Password: "iggy",
 		})
 		if err != nil {
 			panic("COULD NOT LOG IN")
 		}
-		streams[i] = ms
+		clients[i] = cli
 	}
 
-	for index, value := range streams {
+	for index, value := range clients {
 		err := ensureInfrastructureIsInitialized(value, startingStreamId+index)
 		if err != nil {
 			panic("COULD NOT INITIALIZE INFRASTRUCTURE")
@@ -80,7 +74,7 @@ func BenchmarkSendMessage(b *testing.B) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			avgLatency, avgThroughput := SendMessage(streams[i], i, messagesCount, messagesBatch, messageSize)
+			avgLatency, avgThroughput := SendMessage(clients[i], i, messagesCount, messagesBatch, messageSize)
 
 			resultChannel <- struct {
 				avgLatency    float64
@@ -99,7 +93,7 @@ func BenchmarkSendMessage(b *testing.B) {
 	// Print the final results
 	fmt.Printf("Summarized Average Throughput: %.2f MB/s\n", aggregateThroughput)
 
-	for index, value := range streams {
+	for index, value := range clients {
 		err := cleanupInfrastructure(value, startingStreamId+index)
 		if err != nil {
 			panic("COULD NOT CLEANUP INFRASTRUCTURE")
@@ -107,8 +101,8 @@ func BenchmarkSendMessage(b *testing.B) {
 	}
 }
 
-func ensureInfrastructureIsInitialized(messageStream iggy.MessageStream, streamId int) error {
-	if _, streamErr := messageStream.GetStreamById(iggcon.GetStreamRequest{
+func ensureInfrastructureIsInitialized(messageStream iggycli.Client, streamId int) error {
+	if _, streamErr := messageStream.GetStream(iggcon.GetStreamRequest{
 		StreamID: iggcon.NewIdentifier(streamId)}); streamErr != nil {
 		streamErr = messageStream.CreateStream(iggcon.CreateStreamRequest{
 			StreamId: streamId,
@@ -118,7 +112,7 @@ func ensureInfrastructureIsInitialized(messageStream iggy.MessageStream, streamI
 			panic(streamErr)
 		}
 	}
-	if _, topicErr := messageStream.GetTopicById(iggcon.NewIdentifier(streamId), iggcon.NewIdentifier(1)); topicErr != nil {
+	if _, topicErr := messageStream.GetTopic(iggcon.NewIdentifier(streamId), iggcon.NewIdentifier(1)); topicErr != nil {
 		topicErr = messageStream.CreateTopic(iggcon.CreateTopicRequest{
 			TopicId:              1,
 			Name:                 "benchmark",
@@ -134,7 +128,7 @@ func ensureInfrastructureIsInitialized(messageStream iggy.MessageStream, streamI
 	return nil
 }
 
-func cleanupInfrastructure(messageStream iggy.MessageStream, streamId int) error {
+func cleanupInfrastructure(messageStream iggycli.Client, streamId int) error {
 	return messageStream.DeleteStream(iggcon.NewIdentifier(streamId))
 }
 
@@ -158,7 +152,7 @@ func CreateMessages(messagesCount, messageSize int) []iggcon.IggyMessage {
 }
 
 // SendMessage performs the message sending operation.
-func SendMessage(bus iggy.MessageStream, producerNumber, messagesCount, messagesBatch, messageSize int) (avgLatency float64, avgThroughput float64) {
+func SendMessage(bus iggycli.Client, producerNumber, messagesCount, messagesBatch, messageSize int) (avgLatency float64, avgThroughput float64) {
 	totalMessages := messagesBatch * messagesCount
 	totalMessagesBytes := int64(totalMessages * messageSize)
 	fmt.Printf("Executing Send Messages command for producer %d, messages count %d, with size %d bytes\n", producerNumber, totalMessages, totalMessagesBytes)
