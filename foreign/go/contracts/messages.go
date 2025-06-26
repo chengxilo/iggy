@@ -75,13 +75,6 @@ type ReceivedMessage struct {
 	PartitionId   uint32
 }
 
-type FlushUnsavedBufferRequest struct {
-	StreamId    Identifier `json:"streamId"`
-	TopicId     Identifier `json:"topicId"`
-	PartitionId uint32     `json:"partitionId"`
-	Fsync       bool       `json:"fsync"`
-}
-
 type IggyMessage struct {
 	Header      MessageHeader
 	Payload     []byte

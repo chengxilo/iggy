@@ -37,10 +37,3 @@ type ConsumerOffsetInfo struct {
 	CurrentOffset uint64 `json:"currentOffset"`
 	StoredOffset  uint64 `json:"storedOffset"`
 }
-
-type DeleteConsumerOffsetRequest struct {
-	Consumer    Consumer   `json:"consumer"`
-	StreamId    Identifier `json:"streamId"`
-	TopicId     Identifier `json:"topicId"`
-	PartitionId int        `json:"partitionId"`
-}
