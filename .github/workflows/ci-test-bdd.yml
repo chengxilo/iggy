@@ -45,4 +45,4 @@ jobs:
 
       - name: Clean up Docker resources
         if: always()
-        run: ./scripts/run-bdd-tests.sh c
+        run: ./scripts/run-bdd-tests.sh clean
