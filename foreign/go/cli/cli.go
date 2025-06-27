@@ -82,6 +82,7 @@ var (
 )
 
 func getUsage() {
+	fmt.Println("HELLO")
 	fmt.Println("Usage:")
 	fmt.Println("  getstream    -url <url> -port <port> -streamId <streamId>")
 	fmt.Println("  createstream -url <url> -port <port> -streamId <streamId> -name <name>")
