@@ -46,7 +46,7 @@ case $SDK in
 "all")
   echo "🚀 Running all SDK BDD tests..."
   echo "🦀 Starting with Rust tests..."
-  docker compose build --no-cache iggy-server rust-bdd python-bdd
+  docker compose build --no-cache iggy-server rust-bdd python-bdd go-bdd
   docker compose up --abort-on-container-exit rust-bdd
   echo "🐍 Now running Python tests..."
   docker compose up --abort-on-container-exit python-bdd
