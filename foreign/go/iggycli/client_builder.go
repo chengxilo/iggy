@@ -66,7 +66,9 @@ type TcpClientBuilder struct {
 
 // NewTcpClientBuilder create a new TcpClientBuilder
 func NewTcpClientBuilder() *TcpClientBuilder {
-	return &TcpClientBuilder{}
+	return &TcpClientBuilder{
+		config: tcp.GetDefaultTcpClientConfig(),
+	}
 }
 
 // WithServerAddress Sets the server address for the TCP client.
@@ -83,7 +85,6 @@ func (b *TcpClientBuilder) WithContext(ctx context.Context) *TcpClientBuilder {
 
 // Build builds the parent IggyClient with TCP configuration
 func (b *TcpClientBuilder) Build() (*IggyClient, error) {
-	b.config = tcp.GetDefaultTcpClientConfig()
 	cli, err := tcp.NewIggyTcpClient(b.config)
 	if err != nil {
 		return nil, err
