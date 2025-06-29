@@ -19,6 +19,7 @@ package tcp_test
 
 import (
 	"math/rand"
+	"os"
 	"strings"
 	"time"
 
@@ -40,9 +41,13 @@ func createAuthorizedConnection() iggycli.Client {
 }
 
 func createClient() iggycli.Client {
+	addr := os.Getenv("IGGY_TCP_ADDRESS")
+	if addr == "" {
+		addr = "127.0.0.1:8090"
+	}
 	cli, err := iggycli.NewIggyClient(
 		iggycli.WithTcp(
-			tcp.WithServerAddress("127.0.0.1:8090"),
+			tcp.WithServerAddress(addr),
 		),
 	)
 	if err != nil {
