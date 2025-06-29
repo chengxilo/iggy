@@ -160,7 +160,7 @@ func HandleMessage(iggyMessage IggyMessage) error {
 			return err
 		}
 	} else {
-		if err := json.Unmarshal([]byte(iggyMessage.Payload), &envelope); err != nil {
+		if err := json.Unmarshal(iggyMessage.Payload, &envelope); err != nil {
 			return err
 		}
 	}
