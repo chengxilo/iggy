@@ -106,10 +106,10 @@ func BenchmarkSendMessage(b *testing.B) {
 	}
 }
 
-func ensureInfrastructureIsInitialized(messageStream iggycli.Client, streamId int) error {
-	if _, streamErr := messageStream.GetStream(iggcon.GetStreamRequest{
+func ensureInfrastructureIsInitialized(cli iggycli.Client, streamId int) error {
+	if _, streamErr := cli.GetStream(iggcon.GetStreamRequest{
 		StreamID: iggcon.NewIdentifier(streamId)}); streamErr != nil {
-		streamErr = messageStream.CreateStream(iggcon.CreateStreamRequest{
+		streamErr = cli.CreateStream(iggcon.CreateStreamRequest{
 			StreamId: streamId,
 			Name:     "benchmark" + fmt.Sprint(streamId),
 		})
@@ -117,8 +117,8 @@ func ensureInfrastructureIsInitialized(messageStream iggycli.Client, streamId in
 			panic(streamErr)
 		}
 	}
-	if _, topicErr := messageStream.GetTopic(iggcon.NewIdentifier(streamId), iggcon.NewIdentifier(1)); topicErr != nil {
-		topicErr = messageStream.CreateTopic(iggcon.CreateTopicRequest{
+	if _, topicErr := cli.GetTopic(iggcon.NewIdentifier(streamId), iggcon.NewIdentifier(1)); topicErr != nil {
+		topicErr = cli.CreateTopic(iggcon.CreateTopicRequest{
 			TopicId:              1,
 			Name:                 "benchmark",
 			PartitionsCount:      1,
@@ -133,8 +133,8 @@ func ensureInfrastructureIsInitialized(messageStream iggycli.Client, streamId in
 	return nil
 }
 
-func cleanupInfrastructure(messageStream iggycli.Client, streamId int) error {
-	return messageStream.DeleteStream(iggcon.NewIdentifier(streamId))
+func cleanupInfrastructure(cli iggycli.Client, streamId int) error {
+	return cli.DeleteStream(iggcon.NewIdentifier(streamId))
 }
 
 // CreateMessages creates messages with random payloads.
@@ -157,21 +157,20 @@ func CreateMessages(messagesCount, messageSize int) []iggcon.IggyMessage {
 }
 
 // SendMessage performs the message sending operation.
-func SendMessage(bus iggycli.Client, producerNumber, messagesCount, messagesBatch, messageSize int) (avgLatency float64, avgThroughput float64) {
+func SendMessage(cli iggycli.Client, producerNumber, messagesCount, messagesBatch, messageSize int) (avgLatency float64, avgThroughput float64) {
 	totalMessages := messagesBatch * messagesCount
 	totalMessagesBytes := int64(totalMessages * messageSize)
 	fmt.Printf("Executing Send Messages command for producer %d, messages count %d, with size %d bytes\n", producerNumber, totalMessages, totalMessagesBytes)
 
-	busStreamId := iggcon.NewIdentifier(startingStreamId + producerNumber)
-	busTopicId := iggcon.NewIdentifier(topicId)
+	streamId := iggcon.NewIdentifier(startingStreamId + producerNumber)
 	messages := CreateMessages(messagesCount, messageSize)
 	latencies := make([]time.Duration, 0)
 
 	for i := 0; i < messagesBatch; i++ {
 		startTime := time.Now()
-		_ = bus.SendMessages(iggcon.SendMessagesRequest{
-			StreamId:     busStreamId,
-			TopicId:      busTopicId,
+		_ = cli.SendMessages(iggcon.SendMessagesRequest{
+			StreamId:     streamId,
+			TopicId:      iggcon.NewIdentifier(topicId),
 			Partitioning: iggcon.PartitionId(1),
 			Messages:     messages,
 		})
