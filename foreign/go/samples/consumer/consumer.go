@@ -26,6 +26,7 @@ import (
 	. "github.com/apache/iggy/foreign/go/contracts"
 	"github.com/apache/iggy/foreign/go/iggycli"
 	sharedDemoContracts "github.com/apache/iggy/foreign/go/samples/shared"
+	"github.com/apache/iggy/foreign/go/tcp"
 )
 
 // config
@@ -38,7 +39,11 @@ const (
 )
 
 func main() {
-	cli, err := iggycli.NewIggyClientBuilder().WithTcp().WithServerAddress("127.0.0.1:8090").Build()
+	cli, err := iggycli.NewIggyClient(
+		iggycli.WithTcp(
+			tcp.WithServerAddress("127.0.0.1:8090"),
+		),
+	)
 	if err != nil {
 		panic(err)
 	}
@@ -50,16 +55,16 @@ func main() {
 		panic("COULD NOT LOG IN")
 	}
 
-	if err = EnsureInsfrastructureIsInitialized(cli); err != nil {
+	if err = EnsureInfrastructureIsInitialized(cli); err != nil {
 		panic(err)
 	}
 
-	if err := ConsumeMessages(*cli); err != nil {
+	if err = ConsumeMessages(cli); err != nil {
 		panic(err)
 	}
 }
 
-func EnsureInsfrastructureIsInitialized(cli iggycli.Client) error {
+func EnsureInfrastructureIsInitialized(cli iggycli.Client) error {
 	if _, streamErr := cli.GetStream(GetStreamRequest{
 		StreamID: NewIdentifier(DefaultStreamId),
 	}); streamErr != nil {
@@ -97,11 +102,11 @@ func EnsureInsfrastructureIsInitialized(cli iggycli.Client) error {
 	return nil
 }
 
-func ConsumeMessages(messageStream iggycli.IggyClient) error {
+func ConsumeMessages(cli iggycli.Client) error {
 	fmt.Printf("Messages will be polled from stream '%d', topic '%d', partition '%d' with interval %d ms.\n", DefaultStreamId, TopicId, Partition, Interval)
 
 	for {
-		messagesWrapper, err := messageStream.PollMessages(PollMessageRequest{
+		messagesWrapper, err := cli.PollMessages(PollMessageRequest{
 			Count:           1,
 			StreamId:        NewIdentifier(DefaultStreamId),
 			TopicId:         NewIdentifier(TopicId),

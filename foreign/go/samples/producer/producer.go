@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/apache/iggy/foreign/go/iggycli"
+	"github.com/apache/iggy/foreign/go/tcp"
 	"github.com/google/uuid"
 
 	. "github.com/apache/iggy/foreign/go/contracts"
@@ -37,7 +38,11 @@ const (
 )
 
 func main() {
-	cli, err := iggycli.NewIggyClientBuilder().WithTcp().WithServerAddress("127.0.0.1:8090").Build()
+	cli, err := iggycli.NewIggyClient(
+		iggycli.WithTcp(
+			tcp.WithServerAddress("127.0.0.1:8090"),
+		),
+	)
 	if err != nil {
 		panic(err)
 	}

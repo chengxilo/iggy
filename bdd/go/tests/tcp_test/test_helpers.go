@@ -24,6 +24,7 @@ import (
 
 	. "github.com/apache/iggy/foreign/go/contracts"
 	"github.com/apache/iggy/foreign/go/iggycli"
+	"github.com/apache/iggy/foreign/go/tcp"
 )
 
 func createAuthorizedConnection() iggycli.IggyClient {
@@ -39,7 +40,11 @@ func createAuthorizedConnection() iggycli.IggyClient {
 }
 
 func createClient() iggycli.IggyClient {
-	cli, err := iggycli.NewIggyClientBuilder().WithTcp().WithServerAddress("127.0.0.1:8090").Build()
+	cli, err := iggycli.NewIggyClient(
+		iggycli.WithTcp(
+			tcp.WithServerAddress("127.0.0.1:8090"),
+		),
+	)
 	if err != nil {
 		panic(err)
 	}

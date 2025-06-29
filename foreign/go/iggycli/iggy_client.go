@@ -18,12 +18,66 @@
 package iggycli
 
 import (
+	"fmt"
+
 	. "github.com/apache/iggy/foreign/go/contracts"
 	ierror "github.com/apache/iggy/foreign/go/errors"
+	"github.com/apache/iggy/foreign/go/tcp"
 )
 
 type IggyClient struct {
 	client Client
+}
+
+type Options struct {
+	protocol   Protocol
+	client     Client
+	tcpOptions []tcp.Option
+}
+
+func GetDefaultOptions() Options {
+	return Options{
+		protocol:   Tcp,
+		client:     nil,
+		tcpOptions: nil,
+	}
+}
+
+type Option func(*Options)
+
+// WithTcp sets the client protocol to TCP and applies custom TCP options.
+// If no options are provided, the default TCP client configuration will be used.
+func WithTcp(tcpOpts ...tcp.Option) Option {
+	return func(opts *Options) {
+		opts.protocol = Tcp
+		opts.tcpOptions = tcpOpts
+	}
+}
+
+// NewIggyClient create the IggyClient instance.
+// If no Option is provided, NewIggyClient will create a default TCP client.
+func NewIggyClient(options ...Option) (*IggyClient, error) {
+	opts := GetDefaultOptions()
+
+	for _, opt := range options {
+		opt(&opts)
+	}
+
+	var err error
+	var cli Client
+	switch opts.protocol {
+	case Tcp:
+		cli, err = tcp.NewIggyTcpClient(opts.tcpOptions...)
+	default:
+		return nil, fmt.Errorf("unknown protocol type: %v", opts.protocol)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to create an iggy client: %w", err)
+	}
+
+	return &IggyClient{
+		client: cli,
+	}, nil
 }
 
 func (c IggyClient) GetStream(request GetStreamRequest) (*StreamResponse, error) {
@@ -183,11 +237,4 @@ func (c IggyClient) GetClients() ([]ClientResponse, error) {
 
 func (c IggyClient) GetClient(clientId int) (*ClientResponse, error) {
 	return c.client.GetClient(clientId)
-}
-
-// CreateIggyClient Creates a new `IggyClient` with the provided client implementation for the specific transport
-func CreateIggyClient(client Client) *IggyClient {
-	return &IggyClient{
-		client,
-	}
 }

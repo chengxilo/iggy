@@ -25,6 +25,7 @@ import (
 
 	. "github.com/apache/iggy/foreign/go/contracts"
 	"github.com/apache/iggy/foreign/go/iggycli"
+	"github.com/apache/iggy/foreign/go/tcp"
 )
 
 // CLI commands
@@ -340,7 +341,7 @@ func main() {
 }
 
 func CreateClient() iggycli.Client {
-	cli, err := iggycli.NewIggyClientBuilder().WithTcp().WithServerAddress(url + ":" + port).Build()
+	cli, err := iggycli.NewIggyClient(iggycli.WithTcp(tcp.WithServerAddress(url + ":" + port)))
 	if err != nil {
 		panic(err)
 	}
