@@ -27,7 +27,7 @@ import (
 	"github.com/apache/iggy/foreign/go/tcp"
 )
 
-func createAuthorizedConnection() iggycli.IggyClient {
+func createAuthorizedConnection() iggycli.Client {
 	cli := createClient()
 	_, err := cli.LoginUser(LoginUserRequest{
 		Username: "iggy",
@@ -39,7 +39,7 @@ func createAuthorizedConnection() iggycli.IggyClient {
 	return cli
 }
 
-func createClient() iggycli.IggyClient {
+func createClient() iggycli.Client {
 	cli, err := iggycli.NewIggyClient(
 		iggycli.WithTcp(
 			tcp.WithServerAddress("127.0.0.1:8090"),
@@ -48,7 +48,7 @@ func createClient() iggycli.IggyClient {
 	if err != nil {
 		panic(err)
 	}
-	return *cli
+	return cli
 }
 
 func createRandomUInt32() uint32 {

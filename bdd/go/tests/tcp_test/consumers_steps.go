@@ -27,7 +27,7 @@ import (
 )
 
 // operations
-func successfullyCreateConsumer(streamId int, topicId int, cli iggycli.IggyClient) (int, string) {
+func successfullyCreateConsumer(streamId int, topicId int, cli iggycli.Client) (int, string) {
 	request := iggcon.CreateConsumerGroupRequest{
 		StreamId:        iggcon.NewIdentifier(streamId),
 		TopicId:         iggcon.NewIdentifier(topicId),
