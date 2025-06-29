@@ -26,14 +26,12 @@ import (
 
 type Options struct {
 	protocol   Protocol
-	client     Client
 	tcpOptions []tcp.Option
 }
 
 func GetDefaultOptions() Options {
 	return Options{
 		protocol:   Tcp,
-		client:     nil,
 		tcpOptions: nil,
 	}
 }
