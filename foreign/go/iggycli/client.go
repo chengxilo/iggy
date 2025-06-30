@@ -37,8 +37,8 @@ type Client interface {
 
 	StoreConsumerOffset(request StoreConsumerOffsetRequest) error
 	GetConsumerOffset(request GetConsumerOffsetRequest) (*ConsumerOffsetInfo, error)
-	GetConsumerGroups(streamId Identifier, topicId Identifier) ([]ConsumerGroupResponse, error)
-	GetConsumerGroup(streamId, topicId, groupId Identifier) (*ConsumerGroupResponse, error)
+	GetConsumerGroups(streamId Identifier, topicId Identifier) ([]ConsumerGroup, error)
+	GetConsumerGroup(streamId, topicId, groupId Identifier) (*ConsumerGroupDetails, error)
 	CreateConsumerGroup(request CreateConsumerGroupRequest) error
 	DeleteConsumerGroup(request DeleteConsumerGroupRequest) error
 	JoinConsumerGroup(request JoinConsumerGroupRequest) error

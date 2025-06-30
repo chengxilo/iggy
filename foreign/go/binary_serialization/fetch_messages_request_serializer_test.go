@@ -28,7 +28,7 @@ func TestSerialize_TcpFetchMessagesRequest(t *testing.T) {
 	request := TcpFetchMessagesRequest{
 		PollMessageRequest: iggcon.PollMessageRequest{
 			Consumer: iggcon.Consumer{
-				Kind: iggcon.ConsumerSingle,
+				Kind: iggcon.ConsumerKindSingle,
 				Id:   iggcon.NewIdentifier(42),
 			},
 			StreamId:        iggcon.NewIdentifier("test_stream_id"),

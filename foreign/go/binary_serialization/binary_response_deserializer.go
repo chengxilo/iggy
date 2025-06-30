@@ -249,8 +249,8 @@ func DeserializePartition(payload []byte, position int) (PartitionContract, int)
 	return partition, readBytes
 }
 
-func DeserializeConsumerGroups(payload []byte) []ConsumerGroupResponse {
-	var consumerGroups []ConsumerGroupResponse
+func DeserializeConsumerGroups(payload []byte) []ConsumerGroup {
+	var consumerGroups []ConsumerGroup
 	length := len(payload)
 	position := 0
 
@@ -264,12 +264,7 @@ func DeserializeConsumerGroups(payload []byte) []ConsumerGroupResponse {
 	return consumerGroups
 }
 
-func DeserializeConsumerGroup(payload []byte) (*ConsumerGroupResponse, error) {
-	consumerGroup, _ := DeserializeToConsumerGroup(payload, 0)
-	return consumerGroup, nil
-}
-
-func DeserializeToConsumerGroup(payload []byte, position int) (*ConsumerGroupResponse, int) {
+func DeserializeToConsumerGroup(payload []byte, position int) (*ConsumerGroup, int) {
 	id := int(binary.LittleEndian.Uint32(payload[position : position+4]))
 	partitionsCount := int(binary.LittleEndian.Uint32(payload[position+4 : position+8]))
 	membersCount := int(binary.LittleEndian.Uint32(payload[position+8 : position+12]))
@@ -278,7 +273,7 @@ func DeserializeToConsumerGroup(payload []byte, position int) (*ConsumerGroupRes
 
 	readBytes := 12 + 1 + nameLength
 
-	consumerGroup := ConsumerGroupResponse{
+	consumerGroup := ConsumerGroup{
 		Id:              id,
 		MembersCount:    membersCount,
 		PartitionsCount: partitionsCount,
@@ -286,6 +281,15 @@ func DeserializeToConsumerGroup(payload []byte, position int) (*ConsumerGroupRes
 	}
 
 	return &consumerGroup, readBytes
+}
+
+func DeserializeToConsumerGroupDetails(payload []byte) (*ConsumerGroupDetails, int) {
+	consumerGroup, position := DeserializeToConsumerGroup(payload, 0)
+	// TODO: implement logic to deserialize the members.
+	return &ConsumerGroupDetails{
+		ConsumerGroup: *consumerGroup,
+		Members:       nil,
+	}, position
 }
 
 func DeserializeUsers(payload []byte) ([]*UserInfo, error) {

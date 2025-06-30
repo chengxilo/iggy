@@ -55,7 +55,7 @@ func successfullyJoinConsumer(streamId int, topicId int, groupId int, client igg
 
 //assertions
 
-func itShouldReturnSpecificConsumer(id int, name string, consumer *iggcon.ConsumerGroupResponse) {
+func itShouldReturnSpecificConsumer(id int, name string, consumer *iggcon.ConsumerGroup) {
 	It("should fetch consumer with id "+string(rune(id)), func() {
 		Expect(consumer).NotTo(BeNil())
 		Expect(consumer.Id).To(Equal(id))
@@ -67,12 +67,12 @@ func itShouldReturnSpecificConsumer(id int, name string, consumer *iggcon.Consum
 	})
 }
 
-func itShouldContainSpecificConsumer(id int, name string, consumers []iggcon.ConsumerGroupResponse) {
+func itShouldContainSpecificConsumer(id int, name string, consumers []iggcon.ConsumerGroup) {
 	It("should fetch at least one consumer", func() {
 		Expect(len(consumers)).NotTo(Equal(0))
 	})
 
-	var consumer iggcon.ConsumerGroupResponse
+	var consumer iggcon.ConsumerGroup
 	found := false
 
 	for _, s := range consumers {

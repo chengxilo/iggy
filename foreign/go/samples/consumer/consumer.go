@@ -110,7 +110,7 @@ func ConsumeMessages(cli iggycli.Client) error {
 			Count:           1,
 			StreamId:        NewIdentifier(DefaultStreamId),
 			TopicId:         NewIdentifier(TopicId),
-			Consumer:        Consumer{Kind: ConsumerSingle, Id: NewIdentifier(ConsumerId)},
+			Consumer:        Consumer{Kind: ConsumerKindSingle, Id: NewIdentifier(ConsumerId)},
 			PartitionId:     Partition,
 			PollingStrategy: NextPollingStrategy(),
 			AutoCommit:      true,

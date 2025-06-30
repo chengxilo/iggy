@@ -35,7 +35,7 @@ var _ = Describe("GET CONSUMER GROUP BY ID:", func() {
 			group, err := client.GetConsumerGroup(iggcon.NewIdentifier(streamId), iggcon.NewIdentifier(topicId), iggcon.NewIdentifier(groupId))
 
 			itShouldNotReturnError(err)
-			itShouldReturnSpecificConsumer(groupId, name, group)
+			itShouldReturnSpecificConsumer(groupId, name, &group.ConsumerGroup)
 		})
 
 		Context("and tries to get consumer from non-existing stream", func() {
