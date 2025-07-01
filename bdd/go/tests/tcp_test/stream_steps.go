@@ -45,7 +45,7 @@ func successfullyCreateStream(prefix string, client iggycli.Client) (int, string
 
 //assertions
 
-func itShouldReturnSpecificStream(id int, name string, stream iggcon.StreamResponse) {
+func itShouldReturnSpecificStream(id int, name string, stream iggcon.StreamDetails) {
 	It("should fetch stream with id "+string(rune(id)), func() {
 		Expect(stream.Id).To(Equal(id))
 	})
@@ -55,12 +55,12 @@ func itShouldReturnSpecificStream(id int, name string, stream iggcon.StreamRespo
 	})
 }
 
-func itShouldContainSpecificStream(id int, name string, streams []iggcon.StreamResponse) {
+func itShouldContainSpecificStream(id int, name string, streams []iggcon.Stream) {
 	It("should fetch at least one stream", func() {
 		Expect(len(streams)).NotTo(Equal(0))
 	})
 
-	var stream iggcon.StreamResponse
+	var stream iggcon.Stream
 	found := false
 
 	for _, s := range streams {
@@ -83,7 +83,7 @@ func itShouldContainSpecificStream(id int, name string, streams []iggcon.StreamR
 }
 
 func itShouldSuccessfullyCreateStream(id int, expectedName string, client iggycli.Client) {
-	stream, err := client.GetStream(iggcon.GetStreamRequest{StreamID: iggcon.NewIdentifier(id)})
+	stream, err := client.GetStream(iggcon.NewIdentifier(id))
 
 	itShouldNotReturnError(err)
 	It("should create stream with id "+string(rune(id)), func() {
@@ -96,7 +96,7 @@ func itShouldSuccessfullyCreateStream(id int, expectedName string, client iggycl
 }
 
 func itShouldSuccessfullyUpdateStream(id int, expectedName string, client iggycli.Client) {
-	stream, err := client.GetStream(iggcon.GetStreamRequest{StreamID: iggcon.NewIdentifier(id)})
+	stream, err := client.GetStream(iggcon.NewIdentifier(id))
 
 	itShouldNotReturnError(err)
 	It("should update stream with id "+string(rune(id)), func() {
@@ -109,7 +109,7 @@ func itShouldSuccessfullyUpdateStream(id int, expectedName string, client iggycl
 }
 
 func itShouldSuccessfullyDeleteStream(id int, client iggycli.Client) {
-	stream, err := client.GetStream(iggcon.GetStreamRequest{StreamID: iggcon.NewIdentifier(id)})
+	stream, err := client.GetStream(iggcon.NewIdentifier(id))
 
 	itShouldReturnSpecificIggyError(err, ierror.StreamIdNotFound)
 	It("should not return stream", func() {

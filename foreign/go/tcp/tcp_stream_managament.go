@@ -23,7 +23,7 @@ import (
 	ierror "github.com/apache/iggy/foreign/go/errors"
 )
 
-func (tms *IggyTcpClient) GetStreams() ([]StreamResponse, error) {
+func (tms *IggyTcpClient) GetStreams() ([]Stream, error) {
 	buffer, err := tms.sendAndFetchResponse([]byte{}, GetStreamsCode)
 	if err != nil {
 		return nil, err
@@ -32,8 +32,8 @@ func (tms *IggyTcpClient) GetStreams() ([]StreamResponse, error) {
 	return binaryserialization.DeserializeStreams(buffer), nil
 }
 
-func (tms *IggyTcpClient) GetStream(request GetStreamRequest) (*StreamResponse, error) {
-	message := binaryserialization.SerializeIdentifier(request.StreamID)
+func (tms *IggyTcpClient) GetStream(streamId Identifier) (*StreamDetails, error) {
+	message := binaryserialization.SerializeIdentifier(streamId)
 	buffer, err := tms.sendAndFetchResponse(message, GetStreamCode)
 	if err != nil {
 		return nil, err
@@ -42,8 +42,8 @@ func (tms *IggyTcpClient) GetStream(request GetStreamRequest) (*StreamResponse, 
 		return nil, ierror.StreamIdNotFound
 	}
 
-	stream, _ := binaryserialization.DeserializeToStream(buffer, 0)
-	return &stream, nil
+	stream := binaryserialization.DeserializeStream(buffer)
+	return stream, nil
 }
 
 func (tms *IggyTcpClient) CreateStream(request CreateStreamRequest) error {

@@ -107,8 +107,7 @@ func BenchmarkSendMessage(b *testing.B) {
 }
 
 func ensureInfrastructureIsInitialized(cli iggycli.Client, streamId int) error {
-	if _, streamErr := cli.GetStream(iggcon.GetStreamRequest{
-		StreamID: iggcon.NewIdentifier(streamId)}); streamErr != nil {
+	if _, streamErr := cli.GetStream(iggcon.NewIdentifier(streamId)); streamErr != nil {
 		streamErr = cli.CreateStream(iggcon.CreateStreamRequest{
 			StreamId: streamId,
 			Name:     "benchmark" + fmt.Sprint(streamId),

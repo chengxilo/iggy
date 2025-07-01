@@ -20,8 +20,8 @@ package iggycli
 import . "github.com/apache/iggy/foreign/go/contracts"
 
 type Client interface {
-	GetStream(request GetStreamRequest) (*StreamResponse, error)
-	GetStreams() ([]StreamResponse, error)
+	GetStream(streamId Identifier) (*StreamDetails, error)
+	GetStreams() ([]Stream, error)
 	CreateStream(request CreateStreamRequest) error
 	UpdateStream(request UpdateStreamRequest) error
 	DeleteStream(id Identifier) error

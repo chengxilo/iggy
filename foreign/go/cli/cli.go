@@ -231,10 +231,7 @@ func main() {
 			return
 		}
 
-		stream, err := cli.GetStream(
-			GetStreamRequest{
-				StreamID: NewIdentifier(gs_streamId),
-			})
+		stream, err := cli.GetStream(NewIdentifier(gs_streamId))
 		if err != nil {
 			HandleError(err)
 		}

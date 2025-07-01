@@ -47,8 +47,17 @@ func DeserializeOffset(payload []byte) *ConsumerOffsetInfo {
 	}
 }
 
-func DeserializeStreams(payload []byte) []StreamResponse {
-	streams := make([]StreamResponse, 0)
+func DeserializeStream(payload []byte) *StreamDetails {
+	stream, _ := DeserializeToStream(payload, 0)
+	// TODO implement deserialize topics
+	return &StreamDetails{
+		Stream: stream,
+		Topics: nil,
+	}
+}
+
+func DeserializeStreams(payload []byte) []Stream {
+	streams := make([]Stream, 0)
 	position := 0
 
 	//TODO there's a deserialization bug, investigate this
@@ -62,29 +71,7 @@ func DeserializeStreams(payload []byte) []StreamResponse {
 	return streams
 }
 
-func DeserializerStream(payload []byte) *StreamResponse {
-	stream, position := DeserializeToStream(payload, 0)
-	topics := make([]Topic, 0)
-	length := len(payload)
-
-	for position < length {
-		topic, readBytes, _ := DeserializeToTopic(payload, position)
-		topics = append(topics, topic)
-		position += readBytes
-	}
-
-	return &StreamResponse{
-		Id:            stream.Id,
-		TopicsCount:   stream.TopicsCount,
-		Name:          stream.Name,
-		Topics:        topics,
-		MessagesCount: stream.MessagesCount,
-		SizeBytes:     stream.SizeBytes,
-		CreatedAt:     stream.CreatedAt,
-	}
-}
-
-func DeserializeToStream(payload []byte, position int) (StreamResponse, int) {
+func DeserializeToStream(payload []byte, position int) (Stream, int) {
 	id := int(binary.LittleEndian.Uint32(payload[position : position+4]))
 	createdAt := binary.LittleEndian.Uint64(payload[position+4 : position+12])
 	topicsCount := int(binary.LittleEndian.Uint32(payload[position+12 : position+16]))
@@ -97,7 +84,7 @@ func DeserializeToStream(payload []byte, position int) (StreamResponse, int) {
 
 	readBytes := 4 + 8 + 4 + 8 + 8 + 1 + nameLength
 
-	return StreamResponse{
+	return Stream{
 		Id:            id,
 		TopicsCount:   topicsCount,
 		Name:          name,
