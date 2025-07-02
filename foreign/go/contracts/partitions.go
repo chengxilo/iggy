@@ -36,7 +36,7 @@ type PartitionContract struct {
 type CreatePartitionsRequest struct {
 	StreamId        Identifier `json:"streamId"`
 	TopicId         Identifier `json:"topicId"`
-	PartitionsCount int        `json:"partitionsCount"`
+	PartitionsCount uint32     `json:"partitionsCount"`
 }
 
 type DeletePartitionsRequest struct {

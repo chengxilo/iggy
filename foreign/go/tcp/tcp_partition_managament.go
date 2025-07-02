@@ -22,8 +22,12 @@ import (
 	. "github.com/apache/iggy/foreign/go/contracts"
 )
 
-func (tms *IggyTcpClient) CreatePartitions(request CreatePartitionsRequest) error {
-	message := binaryserialization.CreatePartitions(request)
+func (tms *IggyTcpClient) CreatePartitions(streamId Identifier, topicId Identifier, partitionsCount uint32) error {
+	message := binaryserialization.CreatePartitions(CreatePartitionsRequest{
+		StreamId:        streamId,
+		TopicId:         topicId,
+		PartitionsCount: partitionsCount,
+	})
 	_, err := tms.sendAndFetchResponse(message, CreatePartitionsCode)
 	return err
 }
