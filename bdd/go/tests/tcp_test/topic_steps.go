@@ -31,21 +31,22 @@ import (
 //operations
 
 func successfullyCreateTopic(streamId int, client iggycli.Client) (int, string) {
-	request := iggcon.CreateTopicRequest{
-		TopicId:              int(createRandomUInt32()),
-		StreamId:             iggcon.NewIdentifier(streamId),
-		Name:                 createRandomString(128),
-		MessageExpiry:        0,
-		PartitionsCount:      2,
-		CompressionAlgorithm: 1,
-		MaxTopicSize:         math.MaxUint64,
-		ReplicationFactor:    1,
-	}
-	err := client.CreateTopic(request)
+	topicId := int(createRandomUInt32())
+	replicationFactor := uint8(1)
+	name := createRandomString(128)
+	_, err := client.CreateTopic(
+		iggcon.NewIdentifier(streamId),
+		name,
+		2,
+		1,
+		0,
+		math.MaxUint64,
+		&replicationFactor,
+		&topicId)
 
-	itShouldSuccessfullyCreateTopic(streamId, request.TopicId, request.Name, client)
+	itShouldSuccessfullyCreateTopic(streamId, topicId, name, client)
 	itShouldNotReturnError(err)
-	return request.TopicId, request.Name
+	return topicId, name
 }
 
 //assertions

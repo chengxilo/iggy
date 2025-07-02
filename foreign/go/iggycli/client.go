@@ -17,7 +17,11 @@
 
 package iggycli
 
-import . "github.com/apache/iggy/foreign/go/contracts"
+import (
+	"time"
+
+	. "github.com/apache/iggy/foreign/go/contracts"
+)
 
 type Client interface {
 	GetStream(streamId Identifier) (*StreamDetails, error)
@@ -34,7 +38,16 @@ type Client interface {
 
 	GetTopic(streamId, topicId Identifier) (*TopicDetails, error)
 	GetTopics(streamId Identifier) ([]Topic, error)
-	CreateTopic(request CreateTopicRequest) error
+	CreateTopic(
+		streamId Identifier,
+		name string,
+		partitionsCount int,
+		compressionAlgorithm uint8,
+		messageExpiry time.Duration,
+		maxTopicSize uint64,
+		replicationFactor *uint8,
+		topicId *int,
+	) (*TopicDetails, error)
 	UpdateTopic(request UpdateTopicRequest) error
 	DeleteTopic(streamId, topicId Identifier) error
 

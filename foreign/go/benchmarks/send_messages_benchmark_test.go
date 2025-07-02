@@ -115,13 +115,13 @@ func ensureInfrastructureIsInitialized(cli iggycli.Client, streamId int) error {
 		}
 	}
 	if _, topicErr := cli.GetTopic(iggcon.NewIdentifier(streamId), iggcon.NewIdentifier(1)); topicErr != nil {
-		topicErr = cli.CreateTopic(iggcon.CreateTopicRequest{
-			TopicId:              1,
-			Name:                 "benchmark",
-			PartitionsCount:      1,
-			StreamId:             iggcon.NewIdentifier(streamId),
-			CompressionAlgorithm: 1,
-		})
+		_, topicErr = cli.CreateTopic(
+			iggcon.NewIdentifier(streamId),
+			"benchmark",
+			1,
+			1,
+			0,
+			1, nil, nil)
 
 		if topicErr != nil {
 			panic(topicErr)

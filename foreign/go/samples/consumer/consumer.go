@@ -79,12 +79,16 @@ func EnsureInfrastructureIsInitialized(cli iggycli.Client) error {
 	fmt.Printf("Stream with ID: %d exists.\n", DefaultStreamId)
 
 	if _, topicErr := cli.GetTopic(NewIdentifier(DefaultStreamId), NewIdentifier(TopicId)); topicErr != nil {
-		topicErr = cli.CreateTopic(CreateTopicRequest{
-			TopicId:         TopicId,
-			Name:            "Test Topic From Producer Sample",
-			PartitionsCount: 12,
-			StreamId:        NewIdentifier(DefaultStreamId),
-		})
+		uint32TopicId := TopicId
+		_, topicErr = cli.CreateTopic(
+			NewIdentifier(DefaultStreamId),
+			"Test Topic From Producer Sample",
+			12,
+			0,
+			0,
+			0,
+			nil,
+			&uint32TopicId)
 
 		if topicErr != nil {
 			panic(topicErr)

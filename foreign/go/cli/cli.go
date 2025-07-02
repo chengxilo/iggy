@@ -252,12 +252,15 @@ func main() {
 			os.Exit(1)
 		}
 
-		err := cli.CreateTopic(CreateTopicRequest{
-			TopicId:         ct_topicId,
-			Name:            ct_name,
-			PartitionsCount: ct_partitionsCount,
-			StreamId:        NewIdentifier(ct_streamId),
-		})
+		_, err := cli.CreateTopic(
+			NewIdentifier(ct_streamId),
+			ct_name,
+			ct_partitionsCount,
+			0,
+			0,
+			0,
+			nil,
+			&ct_topicId)
 		if err != nil {
 			HandleError(err)
 		}

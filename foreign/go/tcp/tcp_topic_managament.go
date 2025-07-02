@@ -18,6 +18,8 @@
 package tcp
 
 import (
+	"time"
+
 	binaryserialization "github.com/apache/iggy/foreign/go/binary_serialization"
 	. "github.com/apache/iggy/foreign/go/contracts"
 	ierror "github.com/apache/iggy/foreign/go/errors"
@@ -51,13 +53,35 @@ func (tms *IggyTcpClient) GetTopic(streamId Identifier, topicId Identifier) (*To
 	return topic, nil
 }
 
-func (tms *IggyTcpClient) CreateTopic(request CreateTopicRequest) error {
-	if MaxStringLength < len(request.Name) {
-		return ierror.TextTooLong("topic_name")
+func (tms *IggyTcpClient) CreateTopic(
+	streamId Identifier,
+	name string,
+	partitionsCount int,
+	compressionAlgorithm uint8,
+	messageExpiry time.Duration,
+	maxTopicSize uint64,
+	replicationFactor *uint8,
+	topicId *int,
+) (*TopicDetails, error) {
+	if MaxStringLength < len(name) {
+		return nil, ierror.TextTooLong("topic_name")
 	}
-	serializedRequest := binaryserialization.TcpCreateTopicRequest{CreateTopicRequest: request}
-	_, err := tms.sendAndFetchResponse(serializedRequest.Serialize(), CreateTopicCode)
-	return err
+	serializedRequest := binaryserialization.TcpCreateTopicRequest{
+		StreamId:             streamId,
+		Name:                 name,
+		PartitionsCount:      partitionsCount,
+		CompressionAlgorithm: compressionAlgorithm,
+		MessageExpiry:        messageExpiry,
+		MaxTopicSize:         maxTopicSize,
+		ReplicationFactor:    replicationFactor,
+		TopicId:              topicId,
+	}
+	buffer, err := tms.sendAndFetchResponse(serializedRequest.Serialize(), CreateTopicCode)
+	if err != nil {
+		return nil, err
+	}
+	topic, err := binaryserialization.DeserializeTopic(buffer)
+	return topic, err
 }
 
 func (tms *IggyTcpClient) UpdateTopic(request UpdateTopicRequest) error {
