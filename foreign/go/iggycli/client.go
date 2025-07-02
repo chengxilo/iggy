@@ -101,7 +101,7 @@ type Client interface {
 	DeleteUser(identifier Identifier) error
 
 	CreatePersonalAccessToken(name string, expiry uint32) (*RawPersonalAccessToken, error)
-	DeletePersonalAccessToken(request DeletePersonalAccessTokenRequest) error
+	DeletePersonalAccessToken(name string) error
 	GetPersonalAccessTokens() ([]PersonalAccessTokenInfo, error)
 	LoginWithPersonalAccessToken(request LoginWithPersonalAccessTokenRequest) (*LoginUserResponse, error)
 

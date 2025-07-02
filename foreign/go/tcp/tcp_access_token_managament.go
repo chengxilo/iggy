@@ -35,8 +35,10 @@ func (tms *IggyTcpClient) CreatePersonalAccessToken(name string, expiry uint32) 
 	return binaryserialization.DeserializeAccessToken(buffer)
 }
 
-func (tms *IggyTcpClient) DeletePersonalAccessToken(request DeletePersonalAccessTokenRequest) error {
-	message := binaryserialization.SerializeDeletePersonalAccessToken(request)
+func (tms *IggyTcpClient) DeletePersonalAccessToken(name string) error {
+	message := binaryserialization.SerializeDeletePersonalAccessToken(DeletePersonalAccessTokenRequest{
+		Name: name,
+	})
 	_, err := tms.sendAndFetchResponse(message, DeleteAccessTokenCode)
 	return err
 }

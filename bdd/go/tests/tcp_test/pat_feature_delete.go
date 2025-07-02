@@ -18,7 +18,6 @@
 package tcp_test
 
 import (
-	iggcon "github.com/apache/iggy/foreign/go/contracts"
 	. "github.com/onsi/ginkgo/v2"
 )
 
@@ -29,9 +28,7 @@ var _ = Describe("DELETE PAT:", func() {
 			name := createRandomString(16)
 			token := successfullyCreateAccessToken(name, client)
 
-			err := client.DeletePersonalAccessToken(iggcon.DeletePersonalAccessTokenRequest{
-				Name: name,
-			})
+			err := client.DeletePersonalAccessToken(name)
 
 			itShouldNotReturnError(err)
 			itShouldSuccessfullyDeleteAccessToken(token, client)
@@ -41,9 +38,7 @@ var _ = Describe("DELETE PAT:", func() {
 	When("User is not logged in", func() {
 		Context("and tries to delete PAT", func() {
 			client := createClient()
-			err := client.DeletePersonalAccessToken(iggcon.DeletePersonalAccessTokenRequest{
-				Name: createRandomString(16),
-			})
+			err := client.DeletePersonalAccessToken(createRandomString(16))
 			itShouldReturnUnauthenticatedError(err)
 		})
 	})
