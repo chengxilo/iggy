@@ -21,7 +21,7 @@ type StoreConsumerOffsetRequest struct {
 	StreamId    Identifier `json:"streamId"`
 	TopicId     Identifier `json:"topicId"`
 	Consumer    Consumer   `json:"consumer"`
-	PartitionId int        `json:"partitionId"`
+	PartitionId *uint32    `json:"partitionId"`
 	Offset      uint64     `json:"offset"`
 }
 

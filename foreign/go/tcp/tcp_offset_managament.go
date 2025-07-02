@@ -32,8 +32,14 @@ func (tms *IggyTcpClient) GetConsumerOffset(request GetConsumerOffsetRequest) (*
 	return binaryserialization.DeserializeOffset(buffer), nil
 }
 
-func (tms *IggyTcpClient) StoreConsumerOffset(request StoreConsumerOffsetRequest) error {
-	message := binaryserialization.UpdateOffset(request)
+func (tms *IggyTcpClient) StoreConsumerOffset(consumer Consumer, streamId Identifier, topicId Identifier, offset uint64, partitionId *uint32) error {
+	message := binaryserialization.UpdateOffset(StoreConsumerOffsetRequest{
+		StreamId:    streamId,
+		TopicId:     topicId,
+		Offset:      offset,
+		Consumer:    consumer,
+		PartitionId: partitionId,
+	})
 	_, err := tms.sendAndFetchResponse(message, StoreOffsetCode)
 	return err
 }

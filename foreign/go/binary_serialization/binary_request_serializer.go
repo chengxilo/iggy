@@ -37,12 +37,15 @@ func CreateGroup(request CreateConsumerGroupRequest) []byte {
 }
 
 func UpdateOffset(request StoreConsumerOffsetRequest) []byte {
+	if request.PartitionId == nil {
+		request.PartitionId = new(uint32)
+	}
 	bytes := make([]byte, 6+request.StreamId.Length+request.TopicId.Length+request.Consumer.Id.Length+13)
 	bytes[0] = byte(request.Consumer.Kind)
 	position := 7 + request.StreamId.Length + request.TopicId.Length + request.Consumer.Id.Length
 	copy(bytes[1:position], SerializeIdentifiers(request.Consumer.Id, request.StreamId, request.TopicId))
 
-	binary.LittleEndian.PutUint32(bytes[position:position+4], uint32(request.PartitionId))
+	binary.LittleEndian.PutUint32(bytes[position:position+4], *request.PartitionId)
 	binary.LittleEndian.PutUint64(bytes[position+4:position+12], uint64(request.Offset))
 	return bytes
 }
