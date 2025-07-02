@@ -22,8 +22,11 @@ import (
 	. "github.com/apache/iggy/foreign/go/contracts"
 )
 
-func (tms *IggyTcpClient) CreatePersonalAccessToken(request CreatePersonalAccessTokenRequest) (*AccessToken, error) {
-	message := binaryserialization.SerializeCreatePersonalAccessToken(request)
+func (tms *IggyTcpClient) CreatePersonalAccessToken(name string, expiry uint32) (*RawPersonalAccessToken, error) {
+	message := binaryserialization.SerializeCreatePersonalAccessToken(CreatePersonalAccessTokenRequest{
+		Name:   name,
+		Expiry: expiry,
+	})
 	buffer, err := tms.sendAndFetchResponse(message, CreateAccessTokenCode)
 	if err != nil {
 		return nil, err

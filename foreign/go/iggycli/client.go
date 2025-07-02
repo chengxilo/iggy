@@ -100,7 +100,7 @@ type Client interface {
 	ChangePassword(userID Identifier, currentPassword string, newPassword string) error
 	DeleteUser(identifier Identifier) error
 
-	CreatePersonalAccessToken(request CreatePersonalAccessTokenRequest) (*AccessToken, error)
+	CreatePersonalAccessToken(name string, expiry uint32) (*RawPersonalAccessToken, error)
 	DeletePersonalAccessToken(request DeletePersonalAccessTokenRequest) error
 	GetPersonalAccessTokens() ([]PersonalAccessTokenInfo, error)
 	LoginWithPersonalAccessToken(request LoginWithPersonalAccessTokenRequest) (*LoginUserResponse, error)

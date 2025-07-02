@@ -27,12 +27,7 @@ import (
 // OPERATIONS
 
 func successfullyCreateAccessToken(name string, client iggycli.Client) string {
-	request := iggcon.CreatePersonalAccessTokenRequest{
-		Name:   name,
-		Expiry: 0,
-	}
-
-	result, err := client.CreatePersonalAccessToken(request)
+	result, err := client.CreatePersonalAccessToken(name, 0)
 	itShouldNotReturnError(err)
 
 	return result.Token

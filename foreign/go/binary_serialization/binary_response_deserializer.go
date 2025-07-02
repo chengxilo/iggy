@@ -517,10 +517,10 @@ func DeserializeClient(payload []byte) *ClientResponse {
 	return &response
 }
 
-func DeserializeAccessToken(payload []byte) (*AccessToken, error) {
+func DeserializeAccessToken(payload []byte) (*RawPersonalAccessToken, error) {
 	tokenLength := int(payload[0])
 	token := string(payload[1 : 1+tokenLength])
-	return &AccessToken{
+	return &RawPersonalAccessToken{
 		Token: token,
 	}, nil
 }

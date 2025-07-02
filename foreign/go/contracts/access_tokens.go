@@ -33,6 +33,6 @@ type PersonalAccessTokenInfo struct {
 	Expiry *time.Time `json:"Expiry"`
 }
 
-type AccessToken struct {
+type RawPersonalAccessToken struct {
 	Token string `json:"token"`
 }
