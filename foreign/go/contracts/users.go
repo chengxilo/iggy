@@ -30,7 +30,7 @@ type UpdatePermissionsRequest struct {
 
 type UpdateUserRequest struct {
 	UserID   Identifier  `json:"-"`
-	Username string      `json:"username"`
+	Username *string     `json:"username"`
 	Status   *UserStatus `json:"userStatus"`
 }
 

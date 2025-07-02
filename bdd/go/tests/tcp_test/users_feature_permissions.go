@@ -56,12 +56,12 @@ var _ = Describe("UPDATE USER PERMISSIONS:", func() {
 	When("User is not logged in", func() {
 		Context("and tries to change user permissions", func() {
 			client := createClient()
-			request := iggcon.UpdateUserRequest{
-				UserID:   iggcon.NewIdentifier(int(createRandomUInt32())),
-				Username: createRandomString(16),
-			}
-
-			err := client.UpdateUser(request)
+			username := createRandomString(16)
+			err := client.UpdateUser(
+				iggcon.NewIdentifier(int(createRandomUInt32())),
+				&username,
+				nil,
+			)
 			itShouldReturnUnauthenticatedError(err)
 		})
 	})

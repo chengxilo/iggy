@@ -63,8 +63,12 @@ func (tms *IggyTcpClient) CreateUser(username string, password string, status Us
 	return userInfo, nil
 }
 
-func (tms *IggyTcpClient) UpdateUser(request UpdateUserRequest) error {
-	message := binaryserialization.SerializeUpdateUser(request)
+func (tms *IggyTcpClient) UpdateUser(userID Identifier, username *string, status *UserStatus) error {
+	message := binaryserialization.SerializeUpdateUser(UpdateUserRequest{
+		UserID:   userID,
+		Username: username,
+		Status:   status,
+	})
 	_, err := tms.sendAndFetchResponse(message, UpdateUserCode)
 	return err
 }

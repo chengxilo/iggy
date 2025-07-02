@@ -223,8 +223,14 @@ func boolToByte(b bool) byte {
 func SerializeUpdateUser(request UpdateUserRequest) []byte {
 	length := request.UserID.Length + 2
 
-	if len(request.Username) != 0 {
-		length += 2 + len(request.Username)
+	if request.Username == nil {
+		request.Username = new(string)
+	}
+
+	username := *request.Username
+
+	if len(username) != 0 {
+		length += 2 + len(username)
 	}
 
 	if request.Status != nil {
@@ -237,13 +243,13 @@ func SerializeUpdateUser(request UpdateUserRequest) []byte {
 	copy(bytes[position:position+request.UserID.Length+2], SerializeIdentifier(request.UserID))
 	position += position + request.UserID.Length + 2
 
-	if len(request.Username) != 0 {
+	if len(username) != 0 {
 		bytes[position] = 1
 		position++
-		bytes[position] = byte(len(request.Username))
+		bytes[position] = byte(len(username))
 		position++
-		copy(bytes[position:position+len(request.Username)], []byte(request.Username))
-		position += len(request.Username)
+		copy(bytes[position:position+len(username)], username)
+		position += len(username)
 	} else {
 		bytes[position] = 0
 		position++
