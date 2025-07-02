@@ -79,8 +79,11 @@ func (tms *IggyTcpClient) DeleteUser(identifier Identifier) error {
 	return err
 }
 
-func (tms *IggyTcpClient) UpdatePermissions(request UpdatePermissionsRequest) error {
-	message := binaryserialization.SerializeUpdateUserPermissionsRequest(request)
+func (tms *IggyTcpClient) UpdatePermissions(userID Identifier, permissions *Permissions) error {
+	message := binaryserialization.SerializeUpdateUserPermissionsRequest(UpdatePermissionsRequest{
+		UserID:      userID,
+		Permissions: permissions,
+	})
 	_, err := tms.sendAndFetchResponse(message, UpdatePermissionsCode)
 	return err
 }

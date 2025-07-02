@@ -64,9 +64,10 @@ var _ = Describe("CHANGE PASSWORD:", func() {
 	When("User is not logged in", func() {
 		Context("and tries to change password", func() {
 			client := createClient()
-			request := iggcon.UpdatePermissionsRequest{
-				UserID: iggcon.NewIdentifier(int(createRandomUInt32())),
-				Permissions: &iggcon.Permissions{
+
+			err := client.UpdatePermissions(
+				iggcon.NewIdentifier(int(createRandomUInt32())),
+				&iggcon.Permissions{
 					Global: iggcon.GlobalPermissions{
 						ManageServers: false,
 						ReadServers:   false,
@@ -79,10 +80,7 @@ var _ = Describe("CHANGE PASSWORD:", func() {
 						PollMessages:  false,
 						SendMessages:  false,
 					},
-				},
-			}
-
-			err := client.UpdatePermissions(request)
+				})
 			itShouldReturnUnauthenticatedError(err)
 		})
 	})
