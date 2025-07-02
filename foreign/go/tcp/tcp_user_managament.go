@@ -45,10 +45,22 @@ func (tms *IggyTcpClient) GetUsers() ([]*UserInfo, error) {
 	return binaryserialization.DeserializeUsers(buffer)
 }
 
-func (tms *IggyTcpClient) CreateUser(request CreateUserRequest) error {
-	message := binaryserialization.SerializeCreateUserRequest(request)
-	_, err := tms.sendAndFetchResponse(message, CreateUserCode)
-	return err
+func (tms *IggyTcpClient) CreateUser(username string, password string, status UserStatus, permissions *Permissions) (*UserInfoDetails, error) {
+	message := binaryserialization.SerializeCreateUserRequest(CreateUserRequest{
+		Username:    username,
+		Password:    password,
+		Status:      status,
+		Permissions: permissions,
+	})
+	buffer, err := tms.sendAndFetchResponse(message, CreateUserCode)
+	if err != nil {
+		return nil, err
+	}
+	userInfo, err := binaryserialization.DeserializeUser(buffer)
+	if err != nil {
+		return nil, err
+	}
+	return userInfo, nil
 }
 
 func (tms *IggyTcpClient) UpdateUser(request UpdateUserRequest) error {

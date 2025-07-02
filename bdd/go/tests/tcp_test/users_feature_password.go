@@ -26,11 +26,14 @@ var _ = Describe("CHANGE PASSWORD:", func() {
 	When("User is logged in", func() {
 		Context("tries to change password of existing user", func() {
 			client := createAuthorizedConnection()
-			createRequest := iggcon.CreateUserRequest{
-				Username: createRandomStringWithPrefix("ch_p_", 16),
-				Password: "oldPassword",
-				Status:   iggcon.Active,
-				Permissions: &iggcon.Permissions{
+
+			username := createRandomStringWithPrefix("ch_p_", 16)
+			password := "oldPassword"
+			_, err := client.CreateUser(
+				username,
+				password,
+				iggcon.Active,
+				&iggcon.Permissions{
 					Global: iggcon.GlobalPermissions{
 						ManageServers: true,
 						ReadServers:   true,
@@ -43,14 +46,11 @@ var _ = Describe("CHANGE PASSWORD:", func() {
 						PollMessages:  true,
 						SendMessages:  true,
 					},
-				},
-			}
-
-			err := client.CreateUser(createRequest)
-			defer deleteUserAfterTests(createRequest.Username, client)
+				})
+			defer deleteUserAfterTests(username, client)
 			request := iggcon.ChangePasswordRequest{
-				UserID:          iggcon.NewIdentifier(createRequest.Username),
-				CurrentPassword: createRequest.Password,
+				UserID:          iggcon.NewIdentifier(username),
+				CurrentPassword: password,
 				NewPassword:     "newPassword",
 			}
 

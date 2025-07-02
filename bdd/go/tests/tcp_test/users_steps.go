@@ -27,11 +27,11 @@ import (
 // OPERATIONS
 
 func successfullyCreateUser(name string, client iggycli.Client) uint32 {
-	request := iggcon.CreateUserRequest{
-		Username: name,
-		Password: createRandomString(16),
-		Status:   iggcon.Active,
-		Permissions: &iggcon.Permissions{
+	_, err := client.CreateUser(
+		name,
+		createRandomString(16),
+		iggcon.Active,
+		&iggcon.Permissions{
 			Global: iggcon.GlobalPermissions{
 				ManageServers: true,
 				ReadServers:   true,
@@ -44,10 +44,7 @@ func successfullyCreateUser(name string, client iggycli.Client) uint32 {
 				PollMessages:  true,
 				SendMessages:  true,
 			},
-		},
-	}
-
-	err := client.CreateUser(request)
+		})
 	itShouldNotReturnError(err)
 	user, err := client.GetUser(iggcon.NewIdentifier(name))
 	itShouldNotReturnError(err)

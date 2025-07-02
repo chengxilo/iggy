@@ -94,7 +94,7 @@ type Client interface {
 
 	GetUser(identifier Identifier) (*UserInfoDetails, error)
 	GetUsers() ([]*UserInfo, error)
-	CreateUser(request CreateUserRequest) error
+	CreateUser(username string, password string, status UserStatus, permissions *Permissions) (*UserInfoDetails, error)
 	UpdateUser(request UpdateUserRequest) error
 	UpdatePermissions(request UpdatePermissionsRequest) error
 	ChangePassword(request ChangePasswordRequest) error
