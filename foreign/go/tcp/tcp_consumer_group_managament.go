@@ -71,8 +71,8 @@ func (tms *IggyTcpClient) DeleteConsumerGroup(streamId Identifier, topicId Ident
 	return err
 }
 
-func (tms *IggyTcpClient) JoinConsumerGroup(request JoinConsumerGroupRequest) error {
-	message := binaryserialization.SerializeIdentifiers(request.StreamId, request.TopicId, request.ConsumerGroupId)
+func (tms *IggyTcpClient) JoinConsumerGroup(streamId Identifier, topicId Identifier, groupId Identifier) error {
+	message := binaryserialization.SerializeIdentifiers(streamId, topicId, groupId)
 	_, err := tms.sendAndFetchResponse(message, JoinGroupCode)
 	return err
 }

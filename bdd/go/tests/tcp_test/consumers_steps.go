@@ -42,12 +42,12 @@ func successfullyCreateConsumer(streamId int, topicId int, cli iggycli.Client) (
 }
 
 func successfullyJoinConsumer(streamId int, topicId int, groupId int, client iggycli.Client) {
-	request := iggcon.JoinConsumerGroupRequest{
-		StreamId:        iggcon.NewIdentifier(streamId),
-		TopicId:         iggcon.NewIdentifier(topicId),
-		ConsumerGroupId: iggcon.NewIdentifier(groupId),
-	}
-	err := client.JoinConsumerGroup(request)
+
+	err := client.JoinConsumerGroup(
+		iggcon.NewIdentifier(streamId),
+		iggcon.NewIdentifier(topicId),
+		iggcon.NewIdentifier(groupId),
+	)
 
 	itShouldSuccessfullyJoinConsumer(streamId, topicId, groupId, client)
 	itShouldNotReturnError(err)
