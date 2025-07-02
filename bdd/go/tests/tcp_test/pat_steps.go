@@ -61,7 +61,7 @@ func itShouldSuccessfullyDeleteAccessToken(name string, client iggycli.Client) {
 
 func itShouldBePossibleToLogInWithAccessToken(token string) {
 	ms := createClient()
-	userId, err := ms.LoginWithPersonalAccessToken(iggcon.LoginWithPersonalAccessTokenRequest{Token: token})
+	userId, err := ms.LoginWithPersonalAccessToken(token)
 
 	itShouldNotReturnError(err)
 	It("should return userId", func() {

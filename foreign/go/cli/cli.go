@@ -178,10 +178,7 @@ func main() {
 
 	//this is very temporary
 	cli := CreateClient()
-	_, err := cli.LoginUser(LoginUserRequest{
-		Username: "iggy",
-		Password: "iggy",
-	})
+	_, err := cli.LoginUser("iggy", "iggy")
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)

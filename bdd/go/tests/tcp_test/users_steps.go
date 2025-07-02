@@ -138,10 +138,7 @@ func itShouldSuccessfullyUpdateUserPermissions(userId uint32, client iggycli.Cli
 
 func itShouldBePossibleToLogInWithCredentials(username string, password string) {
 	ms := createClient()
-	userId, err := ms.LoginUser(iggcon.LoginUserRequest{
-		Username: username,
-		Password: password,
-	})
+	userId, err := ms.LoginUser(username, password)
 
 	itShouldNotReturnError(err)
 	It("should return userId", func() {

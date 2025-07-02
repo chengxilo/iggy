@@ -103,9 +103,9 @@ type Client interface {
 	CreatePersonalAccessToken(name string, expiry uint32) (*RawPersonalAccessToken, error)
 	DeletePersonalAccessToken(name string) error
 	GetPersonalAccessTokens() ([]PersonalAccessTokenInfo, error)
-	LoginWithPersonalAccessToken(request LoginWithPersonalAccessTokenRequest) (*LoginUserResponse, error)
+	LoginWithPersonalAccessToken(token string) (*IdentityInfo, error)
 
-	LoginUser(request LoginUserRequest) (*LoginUserResponse, error)
+	LoginUser(username string, password string) (*IdentityInfo, error)
 	LogoutUser() error
 
 	GetStats() (*Stats, error)

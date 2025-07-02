@@ -23,17 +23,13 @@ import (
 	"strings"
 	"time"
 
-	. "github.com/apache/iggy/foreign/go/contracts"
 	"github.com/apache/iggy/foreign/go/iggycli"
 	"github.com/apache/iggy/foreign/go/tcp"
 )
 
 func createAuthorizedConnection() iggycli.Client {
 	cli := createClient()
-	_, err := cli.LoginUser(LoginUserRequest{
-		Username: "iggy",
-		Password: "iggy",
-	})
+	_, err := cli.LoginUser("iggy", "iggy")
 	if err != nil {
 		panic(err)
 	}

@@ -27,10 +27,7 @@ var _ = Describe("LOGIN FEATURE:", func() {
 	When("user is already logged in", func() {
 		Context("and tries to log with correct data", func() {
 			client := createAuthorizedConnection()
-			user, err := client.LoginUser(LoginUserRequest{
-				Username: "iggy",
-				Password: "iggy",
-			})
+			user, err := client.LoginUser("iggy", "iggy")
 
 			itShouldNotReturnError(err)
 			itShouldReturnUserId(user, 1)
@@ -38,10 +35,7 @@ var _ = Describe("LOGIN FEATURE:", func() {
 
 		Context("and tries to log with invalid credentials", func() {
 			client := createAuthorizedConnection()
-			user, err := client.LoginUser(LoginUserRequest{
-				Username: "incorrect",
-				Password: "random",
-			})
+			user, err := client.LoginUser("incorrect", "random")
 
 			itShouldReturnError(err)
 			itShouldNotReturnUser(user)
@@ -51,10 +45,7 @@ var _ = Describe("LOGIN FEATURE:", func() {
 	When("user is not logged in", func() {
 		Context("and tries to log with correct data", func() {
 			client := createClient()
-			user, err := client.LoginUser(LoginUserRequest{
-				Username: "iggy",
-				Password: "iggy",
-			})
+			user, err := client.LoginUser("iggy", "iggy")
 
 			itShouldNotReturnError(err)
 			itShouldReturnUserId(user, 1)
@@ -62,10 +53,7 @@ var _ = Describe("LOGIN FEATURE:", func() {
 
 		Context("and tries to log with invalid credentials", func() {
 			client := createClient()
-			user, err := client.LoginUser(LoginUserRequest{
-				Username: "incorrect",
-				Password: "random",
-			})
+			user, err := client.LoginUser("incorrect", "random")
 
 			itShouldReturnError(err)
 			itShouldNotReturnUser(user)
@@ -73,13 +61,13 @@ var _ = Describe("LOGIN FEATURE:", func() {
 	})
 })
 
-func itShouldReturnUserId(user *LoginUserResponse, id uint32) {
+func itShouldReturnUserId(user *IdentityInfo, id uint32) {
 	It("should return user id", func() {
 		Expect(user.UserId).To(Equal(id))
 	})
 }
 
-func itShouldNotReturnUser(user *LoginUserResponse) {
+func itShouldNotReturnUser(user *IdentityInfo) {
 	It("should return user id", func() {
 		Expect(user).To(BeNil())
 	})

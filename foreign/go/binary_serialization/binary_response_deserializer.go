@@ -28,9 +28,9 @@ import (
 	"github.com/klauspost/compress/s2"
 )
 
-func DeserializeLogInResponse(payload []byte) *LoginUserResponse {
+func DeserializeLogInResponse(payload []byte) *IdentityInfo {
 	userId := binary.LittleEndian.Uint32(payload[0:4])
-	return &LoginUserResponse{
+	return &IdentityInfo{
 		UserId: userId,
 	}
 }

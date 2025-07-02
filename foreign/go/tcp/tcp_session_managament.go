@@ -23,8 +23,11 @@ import (
 	. "github.com/apache/iggy/foreign/go/contracts"
 )
 
-func (tms *IggyTcpClient) LoginUser(request LoginUserRequest) (*LoginUserResponse, error) {
-	serializedRequest := binaryserialization.TcpLogInRequest{LoginUserRequest: request}
+func (tms *IggyTcpClient) LoginUser(username string, password string) (*IdentityInfo, error) {
+	serializedRequest := binaryserialization.TcpLogInRequest{
+		Username: username,
+		Password: password,
+	}
 	buffer, err := tms.sendAndFetchResponse(serializedRequest.Serialize(), LoginUserCode)
 	if err != nil {
 		return nil, err
@@ -33,8 +36,10 @@ func (tms *IggyTcpClient) LoginUser(request LoginUserRequest) (*LoginUserRespons
 	return binaryserialization.DeserializeLogInResponse(buffer), nil
 }
 
-func (tms *IggyTcpClient) LoginWithPersonalAccessToken(request LoginWithPersonalAccessTokenRequest) (*LoginUserResponse, error) {
-	message := binaryserialization.SerializeLoginWithPersonalAccessToken(request)
+func (tms *IggyTcpClient) LoginWithPersonalAccessToken(token string) (*IdentityInfo, error) {
+	message := binaryserialization.SerializeLoginWithPersonalAccessToken(LoginWithPersonalAccessTokenRequest{
+		Token: token,
+	})
 	buffer, err := tms.sendAndFetchResponse(message, LoginWithAccessTokenCode)
 	if err != nil {
 		return nil, err

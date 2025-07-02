@@ -46,10 +46,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	_, err = cli.LoginUser(LoginUserRequest{
-		Username: "iggy",
-		Password: "iggy",
-	})
+	_, err = cli.LoginUser("iggy", "iggy")
 	if err != nil {
 		panic("COULD NOT LOG IN")
 	}

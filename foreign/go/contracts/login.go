@@ -28,6 +28,9 @@ type LoginWithPersonalAccessTokenRequest struct {
 	Token string `json:"token"`
 }
 
-type LoginUserResponse struct {
+type IdentityInfo struct {
+	// Unique identifier (numeric) of the user.
 	UserId uint32 `json:"userId"`
+	// The optional tokens, used only by HTTP transport.
+	AccessToken *string `json:"accessToken"`
 }
