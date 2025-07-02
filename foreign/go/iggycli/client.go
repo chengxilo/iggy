@@ -22,7 +22,10 @@ import . "github.com/apache/iggy/foreign/go/contracts"
 type Client interface {
 	GetStream(streamId Identifier) (*StreamDetails, error)
 	GetStreams() ([]Stream, error)
-	CreateStream(request CreateStreamRequest) error
+
+	// CreateStream create a new stream.
+	// Authentication is required, and the permission to manage the streams.
+	CreateStream(name string, streamId *uint32) (*StreamDetails, error)
 	UpdateStream(request UpdateStreamRequest) error
 	DeleteStream(id Identifier) error
 

@@ -65,10 +65,8 @@ func main() {
 
 func EnsureInfrastructureIsInitialized(cli iggycli.Client) error {
 	if _, streamErr := cli.GetStream(NewIdentifier(StreamId)); streamErr != nil {
-		streamErr = cli.CreateStream(CreateStreamRequest{
-			StreamId: StreamId,
-			Name:     "Test Producer Stream",
-		})
+		uint32StreamId := uint32(StreamId)
+		_, streamErr = cli.CreateStream("Test Producer Stream", &uint32StreamId)
 
 		fmt.Println(StreamId)
 

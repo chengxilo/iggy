@@ -46,13 +46,18 @@ func (tms *IggyTcpClient) GetStream(streamId Identifier) (*StreamDetails, error)
 	return stream, nil
 }
 
-func (tms *IggyTcpClient) CreateStream(request CreateStreamRequest) error {
-	if MaxStringLength < len(request.Name) {
-		return ierror.TextTooLong("stream_name")
+func (tms *IggyTcpClient) CreateStream(name string, streamId *uint32) (*StreamDetails, error) {
+	if MaxStringLength < len(name) {
+		return nil, ierror.TextTooLong("stream_name")
 	}
-	serializedRequest := binaryserialization.TcpCreateStreamRequest{CreateStreamRequest: request}
-	_, err := tms.sendAndFetchResponse(serializedRequest.Serialize(), CreateStreamCode)
-	return err
+	serializedRequest := binaryserialization.TcpCreateStreamRequest{Name: name, StreamId: streamId}
+	buffer, err := tms.sendAndFetchResponse(serializedRequest.Serialize(), CreateStreamCode)
+	if err != nil {
+		return nil, err
+	}
+	stream := binaryserialization.DeserializeStream(buffer)
+
+	return stream, err
 }
 
 func (tms *IggyTcpClient) UpdateStream(request UpdateStreamRequest) error {

@@ -195,11 +195,8 @@ func main() {
 			createStreamCmd.PrintDefaults()
 			os.Exit(1)
 		}
-
-		err := cli.CreateStream(CreateStreamRequest{
-			StreamId: cs_streamId,
-			Name:     cs_name,
-		})
+		uintStreamId := uint32(cs_streamId)
+		_, err = cli.CreateStream(cs_name, &uintStreamId)
 		if err != nil {
 			HandleError(err)
 		}

@@ -30,17 +30,14 @@ import (
 //operations
 
 func successfullyCreateStream(prefix string, client iggycli.Client) (int, string) {
-	streamId := int(createRandomUInt32())
+	streamId := createRandomUInt32()
 	name := createRandomStringWithPrefix(prefix, 128)
 
-	err := client.CreateStream(iggcon.CreateStreamRequest{
-		StreamId: streamId,
-		Name:     name,
-	})
+	_, err := client.CreateStream(name, &streamId)
 
 	itShouldNotReturnError(err)
-	itShouldSuccessfullyCreateStream(streamId, name, client)
-	return streamId, name
+	itShouldSuccessfullyCreateStream(int(streamId), name, client)
+	return int(streamId), name
 }
 
 //assertions
