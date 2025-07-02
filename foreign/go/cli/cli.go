@@ -272,11 +272,15 @@ func main() {
 			os.Exit(1)
 		}
 
-		err := cli.UpdateTopic(UpdateTopicRequest{
-			TopicId:  NewIdentifier(ut_topicId),
-			Name:     ut_name,
-			StreamId: NewIdentifier(ut_streamId),
-		})
+		err := cli.UpdateTopic(
+			NewIdentifier(ut_streamId),
+			NewIdentifier(ut_topicId),
+			ut_name,
+			0,
+			0,
+			0,
+			new(uint8),
+		)
 		if err != nil {
 			HandleError(err)
 		}

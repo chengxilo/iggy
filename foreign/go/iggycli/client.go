@@ -48,7 +48,17 @@ type Client interface {
 		replicationFactor *uint8,
 		topicId *int,
 	) (*TopicDetails, error)
-	UpdateTopic(request UpdateTopicRequest) error
+	// UpdateTopic update a topic by unique ID or name.
+	// Authentication is required, and the permission to manage the topics.
+	UpdateTopic(
+		streamId Identifier,
+		topicId Identifier,
+		name string,
+		compressionAlgorithm uint8,
+		messageExpiry time.Duration,
+		maxTopicSize uint64,
+		replicationFactor *uint8,
+	) error
 	DeleteTopic(streamId, topicId Identifier) error
 
 	SendMessages(request SendMessagesRequest) error

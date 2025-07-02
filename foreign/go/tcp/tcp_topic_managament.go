@@ -84,11 +84,26 @@ func (tms *IggyTcpClient) CreateTopic(
 	return topic, err
 }
 
-func (tms *IggyTcpClient) UpdateTopic(request UpdateTopicRequest) error {
-	if MaxStringLength < len(request.Name) {
+func (tms *IggyTcpClient) UpdateTopic(
+	streamId Identifier,
+	topicId Identifier,
+	name string,
+	compressionAlgorithm uint8,
+	messageExpiry time.Duration,
+	maxTopicSize uint64,
+	replicationFactor *uint8,
+) error {
+	if MaxStringLength < len(name) {
 		return ierror.TextTooLong("topic_name")
 	}
-	serializedRequest := binaryserialization.TcpUpdateTopicRequest{UpdateTopicRequest: request}
+	serializedRequest := binaryserialization.TcpUpdateTopicRequest{
+		StreamId:             streamId,
+		TopicId:              topicId,
+		CompressionAlgorithm: compressionAlgorithm,
+		MessageExpiry:        messageExpiry,
+		MaxTopicSize:         maxTopicSize,
+		ReplicationFactor:    replicationFactor,
+		Name:                 name}
 	_, err := tms.sendAndFetchResponse(serializedRequest.Serialize(), UpdateTopicCode)
 	return err
 }
