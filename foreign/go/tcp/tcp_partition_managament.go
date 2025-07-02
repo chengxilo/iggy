@@ -32,8 +32,12 @@ func (tms *IggyTcpClient) CreatePartitions(streamId Identifier, topicId Identifi
 	return err
 }
 
-func (tms *IggyTcpClient) DeletePartitions(request DeletePartitionsRequest) error {
-	message := binaryserialization.DeletePartitions(request)
+func (tms *IggyTcpClient) DeletePartitions(streamId Identifier, topicId Identifier, partitionsCount uint32) error {
+	message := binaryserialization.DeletePartitions(DeletePartitionsRequest{
+		StreamId:        streamId,
+		TopicId:         topicId,
+		PartitionsCount: partitionsCount,
+	})
 	_, err := tms.sendAndFetchResponse(message, DeletePartitionsCode)
 	return err
 }

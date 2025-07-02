@@ -90,7 +90,7 @@ type Client interface {
 	LeaveConsumerGroup(streamId Identifier, topicId Identifier, groupId Identifier) error
 
 	CreatePartitions(streamId Identifier, topicId Identifier, partitionsCount uint32) error
-	DeletePartitions(request DeletePartitionsRequest) error
+	DeletePartitions(streamId Identifier, topicId Identifier, partitionsCount uint32) error
 
 	GetUser(identifier Identifier) (*UserInfoDetails, error)
 	GetUsers() ([]*UserInfo, error)
