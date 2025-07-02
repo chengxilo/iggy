@@ -94,9 +94,9 @@ func DeserializeToStream(payload []byte, position int) (Stream, int) {
 	}, readBytes
 }
 
-func DeserializeFetchMessagesResponse(payload []byte, compression IggyMessageCompression) (*PollMessageResponse, error) {
+func DeserializeFetchMessagesResponse(payload []byte, compression IggyMessageCompression) (*PolledMessage, error) {
 	if len(payload) == 0 {
-		return &PollMessageResponse{
+		return &PolledMessage{
 			PartitionId:   0,
 			CurrentOffset: 0,
 			Messages:      make([]IggyMessage, 0),
@@ -151,7 +151,7 @@ func DeserializeFetchMessagesResponse(payload []byte, compression IggyMessageCom
 	}
 
 	// !TODO: Add message offset ordering
-	return &PollMessageResponse{
+	return &PolledMessage{
 		PartitionId:   partitionId,
 		CurrentOffset: currentOffset,
 		Messages:      messages,

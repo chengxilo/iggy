@@ -32,8 +32,24 @@ func (tms *IggyTcpClient) SendMessages(request SendMessagesRequest) error {
 	return err
 }
 
-func (tms *IggyTcpClient) PollMessages(request PollMessageRequest) (*PollMessageResponse, error) {
-	serializedRequest := binaryserialization.TcpFetchMessagesRequest{PollMessageRequest: request}
+func (tms *IggyTcpClient) PollMessages(
+	streamId Identifier,
+	topicId Identifier,
+	consumer Consumer,
+	strategy PollingStrategy,
+	count uint32,
+	autoCommit bool,
+	partitionId *uint32,
+) (*PolledMessage, error) {
+	serializedRequest := binaryserialization.TcpFetchMessagesRequest{
+		StreamId:    streamId,
+		TopicId:     topicId,
+		Consumer:    consumer,
+		AutoCommit:  autoCommit,
+		Strategy:    strategy,
+		Count:       count,
+		PartitionId: partitionId,
+	}
 	buffer, err := tms.sendAndFetchResponse(serializedRequest.Serialize(), PollMessagesCode)
 	if err != nil {
 		return nil, err

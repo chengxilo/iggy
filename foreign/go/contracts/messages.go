@@ -55,7 +55,7 @@ type PollMessageRequest struct {
 	AutoCommit      bool            `json:"autoCommit"`
 }
 
-type PollMessageResponse struct {
+type PolledMessage struct {
 	PartitionId   uint32
 	CurrentOffset uint64
 	MessageCount  uint32

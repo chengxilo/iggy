@@ -62,7 +62,17 @@ type Client interface {
 	DeleteTopic(streamId, topicId Identifier) error
 
 	SendMessages(request SendMessagesRequest) error
-	PollMessages(request PollMessageRequest) (*PollMessageResponse, error)
+	// PollMessages poll given amount of messages using the specified consumer and strategy from the specified stream and topic by unique IDs or names.
+	// Authentication is required, and the permission to poll the messages.
+	PollMessages(
+		streamId Identifier,
+		topicId Identifier,
+		consumer Consumer,
+		strategy PollingStrategy,
+		count uint32,
+		autoCommit bool,
+		partitionId *uint32,
+	) (*PolledMessage, error)
 
 	StoreConsumerOffset(request StoreConsumerOffsetRequest) error
 	GetConsumerOffset(request GetConsumerOffsetRequest) (*ConsumerOffsetInfo, error)

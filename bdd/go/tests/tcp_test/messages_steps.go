@@ -43,17 +43,17 @@ func createDefaultMessages() []iggcon.IggyMessage {
 }
 
 func itShouldSuccessfullyPublishMessages(streamId int, topicId int, messages []iggcon.IggyMessage, client iggycli.Client) {
-	result, err := client.PollMessages(iggcon.PollMessageRequest{
-		StreamId: iggcon.NewIdentifier(streamId),
-		TopicId:  iggcon.NewIdentifier(topicId),
-		Consumer: iggcon.Consumer{
+	result, err := client.PollMessages(
+		iggcon.NewIdentifier(streamId),
+		iggcon.NewIdentifier(topicId),
+		iggcon.Consumer{
 			Kind: iggcon.ConsumerKindSingle,
 			Id:   iggcon.NewIdentifier(int(createRandomUInt32())),
 		},
-		PollingStrategy: iggcon.FirstPollingStrategy(),
-		Count:           len(messages),
-		AutoCommit:      true,
-	})
+		iggcon.FirstPollingStrategy(),
+		uint32(len(messages)),
+		true,
+		nil)
 
 	It("It should not be nil", func() {
 		Expect(result).NotTo(BeNil())

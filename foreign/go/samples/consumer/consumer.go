@@ -106,15 +106,15 @@ func ConsumeMessages(cli iggycli.Client) error {
 	fmt.Printf("Messages will be polled from stream '%d', topic '%d', partition '%d' with interval %d ms.\n", DefaultStreamId, TopicId, Partition, Interval)
 
 	for {
-		messagesWrapper, err := cli.PollMessages(PollMessageRequest{
-			Count:           1,
-			StreamId:        NewIdentifier(DefaultStreamId),
-			TopicId:         NewIdentifier(TopicId),
-			Consumer:        Consumer{Kind: ConsumerKindSingle, Id: NewIdentifier(ConsumerId)},
-			PartitionId:     Partition,
-			PollingStrategy: NextPollingStrategy(),
-			AutoCommit:      true,
-		})
+		partionId := uint32(Partition)
+		messagesWrapper, err := cli.PollMessages(
+			NewIdentifier(DefaultStreamId),
+			NewIdentifier(TopicId),
+			Consumer{Kind: ConsumerKindSingle, Id: NewIdentifier(ConsumerId)},
+			NextPollingStrategy(),
+			1,
+			true,
+			&partionId)
 		if err != nil {
 			return err
 		}
