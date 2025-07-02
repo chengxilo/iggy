@@ -129,10 +129,7 @@ var _ = Describe("UPDATE TOPIC:", func() {
 	When("User is not logged in", func() {
 		Context("and tries to update stream", func() {
 			client := createClient()
-			err := client.UpdateStream(iggcon.UpdateStreamRequest{
-				StreamId: iggcon.NewIdentifier(int(createRandomUInt32())),
-				Name:     createRandomString(128),
-			})
+			err := client.UpdateStream(iggcon.NewIdentifier(int(createRandomUInt32())), createRandomString(128))
 
 			itShouldReturnUnauthenticatedError(err)
 		})

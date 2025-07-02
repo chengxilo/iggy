@@ -209,10 +209,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		err := cli.UpdateStream(UpdateStreamRequest{
-			StreamId: NewIdentifier(us_streamId),
-			Name:     us_name,
-		})
+		err := cli.UpdateStream(NewIdentifier(us_streamId), us_name)
 		if err != nil {
 			HandleError(err)
 		}

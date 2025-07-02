@@ -22,11 +22,6 @@ type CreateStreamRequest struct {
 	Name     string `json:"name"`
 }
 
-type UpdateStreamRequest struct {
-	StreamId Identifier `json:"streamId"`
-	Name     string     `json:"name"`
-}
-
 type Stream struct {
 	Id            int    `json:"id"`
 	Name          string `json:"name"`

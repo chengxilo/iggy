@@ -60,11 +60,11 @@ func (tms *IggyTcpClient) CreateStream(name string, streamId *uint32) (*StreamDe
 	return stream, err
 }
 
-func (tms *IggyTcpClient) UpdateStream(request UpdateStreamRequest) error {
-	if MaxStringLength <= len(request.Name) {
+func (tms *IggyTcpClient) UpdateStream(streamId Identifier, name string) error {
+	if MaxStringLength <= len(name) {
 		return ierror.TextTooLong("stream_name")
 	}
-	serializedRequest := binaryserialization.TcpUpdateStreamRequest{UpdateStreamRequest: request}
+	serializedRequest := binaryserialization.TcpUpdateStreamRequest{StreamId: streamId, Name: name}
 	_, err := tms.sendAndFetchResponse(serializedRequest.Serialize(), UpdateStreamCode)
 	return err
 }

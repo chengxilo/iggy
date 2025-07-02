@@ -26,7 +26,10 @@ type Client interface {
 	// CreateStream create a new stream.
 	// Authentication is required, and the permission to manage the streams.
 	CreateStream(name string, streamId *uint32) (*StreamDetails, error)
-	UpdateStream(request UpdateStreamRequest) error
+
+	// UpdateStream update a stream by unique ID or name.
+	// Authentication is required, and the permission to manage the streams.
+	UpdateStream(streamId Identifier, name string) error
 	DeleteStream(id Identifier) error
 
 	GetTopic(streamId, topicId Identifier) (*TopicDetails, error)
