@@ -81,7 +81,7 @@ type Client interface {
 	) (*PolledMessage, error)
 
 	StoreConsumerOffset(consumer Consumer, streamId Identifier, topicId Identifier, offset uint64, partitionId *uint32) error
-	GetConsumerOffset(request GetConsumerOffsetRequest) (*ConsumerOffsetInfo, error)
+	GetConsumerOffset(consumer Consumer, streamId Identifier, topicId Identifier, partitionId *uint32) (*ConsumerOffsetInfo, error)
 	GetConsumerGroups(streamId Identifier, topicId Identifier) ([]ConsumerGroup, error)
 	GetConsumerGroup(streamId, topicId, groupId Identifier) (*ConsumerGroupDetails, error)
 	CreateConsumerGroup(streamId Identifier, topicId Identifier, name string, groupId *uint32) (*ConsumerGroupDetails, error)
