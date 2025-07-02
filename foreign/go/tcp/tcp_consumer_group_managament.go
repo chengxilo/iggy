@@ -77,8 +77,8 @@ func (tms *IggyTcpClient) JoinConsumerGroup(streamId Identifier, topicId Identif
 	return err
 }
 
-func (tms *IggyTcpClient) LeaveConsumerGroup(request LeaveConsumerGroupRequest) error {
-	message := binaryserialization.SerializeIdentifiers(request.StreamId, request.TopicId, request.ConsumerGroupId)
+func (tms *IggyTcpClient) LeaveConsumerGroup(streamId Identifier, topicId Identifier, groupId Identifier) error {
+	message := binaryserialization.SerializeIdentifiers(streamId, topicId, groupId)
 	_, err := tms.sendAndFetchResponse(message, LeaveGroupCode)
 	return err
 }

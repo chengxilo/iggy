@@ -87,7 +87,7 @@ type Client interface {
 	CreateConsumerGroup(streamId Identifier, topicId Identifier, name string, groupId *uint32) (*ConsumerGroupDetails, error)
 	DeleteConsumerGroup(streamId Identifier, topicId Identifier, groupId Identifier) error
 	JoinConsumerGroup(streamId Identifier, topicId Identifier, groupId Identifier) error
-	LeaveConsumerGroup(request LeaveConsumerGroupRequest) error
+	LeaveConsumerGroup(streamId Identifier, topicId Identifier, groupId Identifier) error
 
 	CreatePartitions(request CreatePartitionsRequest) error
 	DeletePartitions(request DeletePartitionsRequest) error
