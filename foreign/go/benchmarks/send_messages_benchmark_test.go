@@ -165,12 +165,12 @@ func SendMessage(cli iggycli.Client, producerNumber, messagesCount, messagesBatc
 
 	for i := 0; i < messagesBatch; i++ {
 		startTime := time.Now()
-		_ = cli.SendMessages(iggcon.SendMessagesRequest{
-			StreamId:     streamId,
-			TopicId:      iggcon.NewIdentifier(topicId),
-			Partitioning: iggcon.PartitionId(1),
-			Messages:     messages,
-		})
+		_ = cli.SendMessages(
+			streamId,
+			iggcon.NewIdentifier(topicId),
+			iggcon.PartitionId(1),
+			messages,
+		)
 		elapsedTime := time.Since(startTime)
 		latencies = append(latencies, elapsedTime)
 	}

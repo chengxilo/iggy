@@ -60,8 +60,14 @@ type Client interface {
 		replicationFactor *uint8,
 	) error
 	DeleteTopic(streamId, topicId Identifier) error
-
-	SendMessages(request SendMessagesRequest) error
+	// SendMessages sends messages using specified partitioning strategy to the given stream and topic by unique IDs or names.
+	// Authentication is required, and the permission to send the messages.
+	SendMessages(
+		streamId Identifier,
+		topicId Identifier,
+		partitioning Partitioning,
+		messages []IggyMessage,
+	) error
 	// PollMessages poll given amount of messages using the specified consumer and strategy from the specified stream and topic by unique IDs or names.
 	// Authentication is required, and the permission to poll the messages.
 	PollMessages(

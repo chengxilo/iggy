@@ -127,12 +127,12 @@ func PublishMessages(messageStream iggycli.Client) error {
 			})
 		}
 
-		err := messageStream.SendMessages(SendMessagesRequest{
-			StreamId:     NewIdentifier(StreamId),
-			TopicId:      NewIdentifier(TopicId),
-			Messages:     messages,
-			Partitioning: PartitionId(Partition),
-		})
+		err := messageStream.SendMessages(
+			NewIdentifier(StreamId),
+			NewIdentifier(TopicId),
+			PartitionId(Partition),
+			messages,
+		)
 		if err != nil {
 			fmt.Printf("%s", err)
 			return nil
