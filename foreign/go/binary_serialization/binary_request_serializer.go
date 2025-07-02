@@ -24,12 +24,15 @@ import (
 )
 
 func CreateGroup(request CreateConsumerGroupRequest) []byte {
+	if request.ConsumerGroupId == nil {
+		request.ConsumerGroupId = new(uint32)
+	}
 	customIdOffset := 4 + request.StreamId.Length + request.TopicId.Length
 	bytes := make([]byte, 4+request.StreamId.Length+request.TopicId.Length+1+4+len(request.Name))
 	copy(bytes[0:customIdOffset], SerializeIdentifiers(request.StreamId, request.TopicId))
-	binary.LittleEndian.PutUint32(bytes[customIdOffset:customIdOffset+4], uint32(request.ConsumerGroupId))
+	binary.LittleEndian.PutUint32(bytes[customIdOffset:customIdOffset+4], *request.ConsumerGroupId)
 	bytes[customIdOffset+4] = byte(len(request.Name))
-	copy(bytes[customIdOffset+5:], []byte(request.Name))
+	copy(bytes[customIdOffset+5:], request.Name)
 	return bytes
 }
 

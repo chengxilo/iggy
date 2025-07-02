@@ -28,17 +28,17 @@ import (
 
 // operations
 func successfullyCreateConsumer(streamId int, topicId int, cli iggycli.Client) (int, string) {
-	request := iggcon.CreateConsumerGroupRequest{
-		StreamId:        iggcon.NewIdentifier(streamId),
-		TopicId:         iggcon.NewIdentifier(topicId),
-		ConsumerGroupId: int(createRandomUInt32()),
-		Name:            createRandomString(16),
-	}
-	err := cli.CreateConsumerGroup(request)
+	groupId := createRandomUInt32()
+	name := createRandomString(16)
+	_, err := cli.CreateConsumerGroup(iggcon.NewIdentifier(streamId),
+		iggcon.NewIdentifier(topicId),
+		name,
+		&groupId,
+	)
 
-	itShouldSuccessfullyCreateConsumer(streamId, topicId, request.ConsumerGroupId, request.Name, cli)
+	itShouldSuccessfullyCreateConsumer(streamId, topicId, int(groupId), name, cli)
 	itShouldNotReturnError(err)
-	return request.ConsumerGroupId, request.Name
+	return int(groupId), name
 }
 
 func successfullyJoinConsumer(streamId int, topicId int, groupId int, client iggycli.Client) {
