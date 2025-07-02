@@ -97,7 +97,7 @@ type Client interface {
 	CreateUser(username string, password string, status UserStatus, permissions *Permissions) (*UserInfoDetails, error)
 	UpdateUser(userID Identifier, username *string, status *UserStatus) error
 	UpdatePermissions(userID Identifier, permissions *Permissions) error
-	ChangePassword(request ChangePasswordRequest) error
+	ChangePassword(userID Identifier, currentPassword string, newPassword string) error
 	DeleteUser(identifier Identifier) error
 
 	CreatePersonalAccessToken(request CreatePersonalAccessTokenRequest) (*AccessToken, error)

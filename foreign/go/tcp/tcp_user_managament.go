@@ -88,8 +88,12 @@ func (tms *IggyTcpClient) UpdatePermissions(userID Identifier, permissions *Perm
 	return err
 }
 
-func (tms *IggyTcpClient) ChangePassword(request ChangePasswordRequest) error {
-	message := binaryserialization.SerializeChangePasswordRequest(request)
+func (tms *IggyTcpClient) ChangePassword(userID Identifier, currentPassword string, newPassword string) error {
+	message := binaryserialization.SerializeChangePasswordRequest(ChangePasswordRequest{
+		UserID:          userID,
+		CurrentPassword: currentPassword,
+		NewPassword:     newPassword,
+	})
 	_, err := tms.sendAndFetchResponse(message, ChangePasswordCode)
 	return err
 }

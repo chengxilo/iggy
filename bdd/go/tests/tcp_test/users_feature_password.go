@@ -48,13 +48,8 @@ var _ = Describe("CHANGE PASSWORD:", func() {
 					},
 				})
 			defer deleteUserAfterTests(username, client)
-			request := iggcon.ChangePasswordRequest{
-				UserID:          iggcon.NewIdentifier(username),
-				CurrentPassword: password,
-				NewPassword:     "newPassword",
-			}
 
-			err = client.ChangePassword(request)
+			err = client.ChangePassword(iggcon.NewIdentifier(username), password, "newPassword")
 
 			itShouldNotReturnError(err)
 			//itShouldBePossibleToLogInWithCredentials(createRequest.Username, request.NewPassword)
