@@ -289,7 +289,7 @@ func DeserializeUsers(payload []byte) ([]UserInfo, error) {
 	position := 0
 
 	for position < length {
-		response, readBytes, err := deserializeUserResponse(payload, position)
+		response, readBytes, err := deserializeToUser(payload, position)
 		if err != nil {
 			return nil, err
 		}
@@ -301,7 +301,7 @@ func DeserializeUsers(payload []byte) ([]UserInfo, error) {
 }
 
 func DeserializeUser(payload []byte) (*UserInfoDetails, error) {
-	response, position, err := deserializeUserResponse(payload, 0)
+	response, position, err := deserializeToUser(payload, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -412,7 +412,7 @@ func deserializePermissions(bytes []byte) *Permissions {
 	}
 }
 
-func deserializeUserResponse(payload []byte, position int) (*UserInfo, int, error) {
+func deserializeToUser(payload []byte, position int) (*UserInfo, int, error) {
 	if len(payload) < position+14 {
 		return nil, 0, errors.New("not enough data to map UserInfo")
 	}
