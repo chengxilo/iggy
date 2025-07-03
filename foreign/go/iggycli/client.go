@@ -111,6 +111,6 @@ type Client interface {
 	GetStats() (*Stats, error)
 	Ping() error
 
-	GetClients() ([]ClientResponse, error)
-	GetClient(clientId int) (*ClientResponse, error)
+	GetClients() ([]ClientInfo, error)
+	GetClient(clientId int) (*ClientInfoDetails, error)
 }

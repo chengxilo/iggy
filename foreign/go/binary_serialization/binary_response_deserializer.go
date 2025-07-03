@@ -446,12 +446,12 @@ func deserializeUserResponse(payload []byte, position int) (*UserInfo, int, erro
 	}, readBytes, nil
 }
 
-func DeserializeClients(payload []byte) ([]ClientResponse, error) {
+func DeserializeClients(payload []byte) ([]ClientInfo, error) {
 	if len(payload) == 0 {
-		return []ClientResponse{}, nil
+		return []ClientInfo{}, nil
 	}
 
-	var response []ClientResponse
+	var response []ClientInfo
 	length := len(payload)
 	position := 0
 
@@ -464,7 +464,7 @@ func DeserializeClients(payload []byte) ([]ClientResponse, error) {
 	return response, nil
 }
 
-func MapClientInfo(payload []byte, position int) (ClientResponse, int) {
+func MapClientInfo(payload []byte, position int) (ClientInfo, int) {
 	var readBytes int
 	id := binary.LittleEndian.Uint32(payload[position : position+4])
 	userId := binary.LittleEndian.Uint32(payload[position+4 : position+8])
@@ -484,7 +484,7 @@ func MapClientInfo(payload []byte, position int) (ClientResponse, int) {
 	consumerGroupsCount := binary.LittleEndian.Uint32(payload[position : position+4])
 	readBytes += 4
 
-	return ClientResponse{
+	return ClientInfo{
 		ID:                  id,
 		UserID:              userId,
 		Transport:           transport,
@@ -493,13 +493,13 @@ func MapClientInfo(payload []byte, position int) (ClientResponse, int) {
 	}, readBytes
 }
 
-func DeserializeClient(payload []byte) *ClientResponse {
-	response, position := MapClientInfo(payload, 0)
-	consumerGroups := make([]ConsumerGroupInfo, response.ConsumerGroupsCount)
+func DeserializeClient(payload []byte) *ClientInfoDetails {
+	clientInfo, position := MapClientInfo(payload, 0)
+	consumerGroups := make([]ConsumerGroupInfo, clientInfo.ConsumerGroupsCount)
 	length := len(payload)
 
 	for position < length {
-		for i := uint32(0); i < response.ConsumerGroupsCount; i++ {
+		for i := uint32(0); i < clientInfo.ConsumerGroupsCount; i++ {
 			streamId := int32(binary.LittleEndian.Uint32(payload[position : position+4]))
 			topicId := int32(binary.LittleEndian.Uint32(payload[position+4 : position+8]))
 			consumerGroupId := int32(binary.LittleEndian.Uint32(payload[position+8 : position+12]))
@@ -513,8 +513,10 @@ func DeserializeClient(payload []byte) *ClientResponse {
 			position += 12
 		}
 	}
-	response.ConsumerGroups = consumerGroups
-	return &response
+	return &ClientInfoDetails{
+		ClientInfo:     clientInfo,
+		ConsumerGroups: consumerGroups,
+	}
 }
 
 func DeserializeAccessToken(payload []byte) (*RawPersonalAccessToken, error) {
