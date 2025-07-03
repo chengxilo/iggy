@@ -279,12 +279,12 @@ func DeserializeToConsumerGroupDetails(payload []byte) (*ConsumerGroupDetails, i
 	}, position
 }
 
-func DeserializeUsers(payload []byte) ([]*UserInfo, error) {
+func DeserializeUsers(payload []byte) ([]UserInfo, error) {
 	if len(payload) == 0 {
 		return nil, errors.New("empty payload")
 	}
 
-	var result []*UserInfo
+	var result []UserInfo
 	length := len(payload)
 	position := 0
 
@@ -293,7 +293,7 @@ func DeserializeUsers(payload []byte) ([]*UserInfo, error) {
 		if err != nil {
 			return nil, err
 		}
-		result = append(result, response)
+		result = append(result, *response)
 		position += readBytes
 	}
 

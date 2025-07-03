@@ -152,7 +152,7 @@ func itShouldReturnSpecificUser(name string, user iggcon.UserInfo) {
 	})
 }
 
-func itShouldContainSpecificUser(name string, users []*iggcon.UserInfo) {
+func itShouldContainSpecificUser(name string, users []iggcon.UserInfo) {
 	It("should fetch at least one user", func() {
 		Expect(len(users)).NotTo(Equal(0))
 	})
@@ -162,7 +162,7 @@ func itShouldContainSpecificUser(name string, users []*iggcon.UserInfo) {
 
 	for _, s := range users {
 		if s.Username == name {
-			user = *s
+			user = s
 			found = true
 			break
 		}

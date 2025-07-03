@@ -36,7 +36,7 @@ func (tms *IggyTcpClient) GetUser(identifier Identifier) (*UserInfoDetails, erro
 	return binaryserialization.DeserializeUser(buffer)
 }
 
-func (tms *IggyTcpClient) GetUsers() ([]*UserInfo, error) {
+func (tms *IggyTcpClient) GetUsers() ([]UserInfo, error) {
 	buffer, err := tms.sendAndFetchResponse([]byte{}, GetUsersCode)
 	if err != nil {
 		return nil, err

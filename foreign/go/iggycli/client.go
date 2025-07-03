@@ -190,7 +190,7 @@ type Client interface {
 
 	// GetUsers get the info about all the users.
 	// Authentication is required, and the permission to read the users.
-	GetUsers() ([]*UserInfo, error)
+	GetUsers() ([]UserInfo, error)
 
 	// CreateUser create a new user.
 	// Authentication is required, and the permission to manage the users.
