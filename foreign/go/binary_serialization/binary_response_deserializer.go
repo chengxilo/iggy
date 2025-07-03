@@ -270,13 +270,13 @@ func DeserializeToConsumerGroup(payload []byte, position int) (*ConsumerGroup, i
 	return &consumerGroup, readBytes
 }
 
-func DeserializeToConsumerGroupDetails(payload []byte) (*ConsumerGroupDetails, int) {
-	consumerGroup, position := DeserializeToConsumerGroup(payload, 0)
+func DeserializeConsumerGroup(payload []byte) *ConsumerGroupDetails {
+	consumerGroup, _ := DeserializeToConsumerGroup(payload, 0)
 	// TODO: implement logic to deserialize the members.
 	return &ConsumerGroupDetails{
 		ConsumerGroup: *consumerGroup,
 		Members:       nil,
-	}, position
+	}
 }
 
 func DeserializeUsers(payload []byte) ([]UserInfo, error) {

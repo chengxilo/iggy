@@ -43,7 +43,7 @@ func (tms *IggyTcpClient) GetConsumerGroup(streamId, topicId, groupId Identifier
 		return nil, ierror.ConsumerGroupIdNotFound
 	}
 
-	consumerGroupDetails, _ := binaryserialization.DeserializeToConsumerGroupDetails(buffer)
+	consumerGroupDetails := binaryserialization.DeserializeConsumerGroup(buffer)
 	return consumerGroupDetails, err
 }
 
@@ -61,7 +61,7 @@ func (tms *IggyTcpClient) CreateConsumerGroup(streamId Identifier, topicId Ident
 	if err != nil {
 		return nil, err
 	}
-	consumerGroup, _ := binaryserialization.DeserializeToConsumerGroupDetails(buffer)
+	consumerGroup := binaryserialization.DeserializeConsumerGroup(buffer)
 	return consumerGroup, err
 }
 
