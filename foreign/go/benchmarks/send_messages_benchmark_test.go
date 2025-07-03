@@ -118,7 +118,10 @@ func ensureInfrastructureIsInitialized(cli iggycli.Client, streamId int) error {
 			1,
 			1,
 			0,
-			1, nil, nil)
+			1,
+			nil,
+			nil,
+		)
 
 		if topicErr != nil {
 			panic(topicErr)
