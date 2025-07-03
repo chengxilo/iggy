@@ -104,11 +104,22 @@ type Client interface {
 
 	// StoreConsumerOffset store the consumer offset for a specific consumer or consumer group for the given stream and topic by unique IDs or names.
 	// Authentication is required, and the permission to poll the messages.
-	StoreConsumerOffset(consumer Consumer, streamId Identifier, topicId Identifier, offset uint64, partitionId *uint32) error
+	StoreConsumerOffset(
+		consumer Consumer,
+		streamId Identifier,
+		topicId Identifier,
+		offset uint64,
+		partitionId *uint32,
+	) error
 
 	// GetConsumerOffset get the consumer offset for a specific consumer or consumer group for the given stream and topic by unique IDs or names.
 	// Authentication is required, and the permission to poll the messages.
-	GetConsumerOffset(consumer Consumer, streamId Identifier, topicId Identifier, partitionId *uint32) (*ConsumerOffsetInfo, error)
+	GetConsumerOffset(
+		consumer Consumer,
+		streamId Identifier,
+		topicId Identifier,
+		partitionId *uint32,
+	) (*ConsumerOffsetInfo, error)
 
 	// GetConsumerGroups get the info about all the consumer groups for the given stream and topic by unique IDs or names.
 	// Authentication is required, and the permission to read the streams or topics.
@@ -116,33 +127,62 @@ type Client interface {
 
 	// GetConsumerGroup get the info about a specific consumer group by unique ID or name for the given stream and topic by unique IDs or names.
 	// Authentication is required, and the permission to read the streams or topics.
-	GetConsumerGroup(streamId, topicId, groupId Identifier) (*ConsumerGroupDetails, error)
+	GetConsumerGroup(
+		streamId Identifier,
+		topicId Identifier,
+		groupId Identifier,
+	) (*ConsumerGroupDetails, error)
 
 	// CreateConsumerGroup create a new consumer group for the given stream and topic by unique IDs or names.
 	// Authentication is required, and the permission to manage the streams or topics.
-	CreateConsumerGroup(streamId Identifier, topicId Identifier, name string, groupId *uint32) (*ConsumerGroupDetails, error)
+	CreateConsumerGroup(
+		streamId Identifier,
+		topicId Identifier,
+		name string,
+		groupId *uint32,
+	) (*ConsumerGroupDetails, error)
 
 	// DeleteConsumerGroup delete a consumer group by unique ID or name for the given stream and topic by unique IDs or names.
 	// Authentication is required, and the permission to manage the streams or topics.
-	DeleteConsumerGroup(streamId Identifier, topicId Identifier, groupId Identifier) error
+	DeleteConsumerGroup(
+		streamId Identifier,
+		topicId Identifier,
+		groupId Identifier,
+	) error
 
 	// JoinConsumerGroup join a consumer group by unique ID or name for the given stream and topic by unique IDs or names.
 	// Authentication is required, and the permission to read the streams or topics.
-	JoinConsumerGroup(streamId Identifier, topicId Identifier, groupId Identifier) error
+	JoinConsumerGroup(
+		streamId Identifier,
+		topicId Identifier,
+		groupId Identifier,
+	) error
 
 	// LeaveConsumerGroup leave a consumer group by unique ID or name for the given stream and topic by unique IDs or names.
 	// Authentication is required, and the permission to read the streams or topics.
-	LeaveConsumerGroup(streamId Identifier, topicId Identifier, groupId Identifier) error
+	LeaveConsumerGroup(
+		streamId Identifier,
+		topicId Identifier,
+		groupId Identifier,
+	) error
 
 	// CreatePartitions create new N partitions for a topic by unique ID or name.
 	// For example, given a topic with 3 partitions, if you create 2 partitions, the topic will have 5 partitions (from 1 to 5).
 	// Authentication is required, and the permission to manage the partitions.
-	CreatePartitions(streamId Identifier, topicId Identifier, partitionsCount uint32) error
+	CreatePartitions(
+		streamId Identifier,
+		topicId Identifier,
+		partitionsCount uint32,
+	) error
 
 	// DeletePartitions delete last N partitions for a topic by unique ID or name.
 	// For example, given a topic with 5 partitions, if you delete 2 partitions, the topic will have 3 partitions left (from 1 to 3).
 	// Authentication is required, and the permission to manage the partitions.
-	DeletePartitions(streamId Identifier, topicId Identifier, partitionsCount uint32) error
+	DeletePartitions(
+		streamId Identifier,
+		topicId Identifier,
+		partitionsCount uint32,
+	) error
 
 	// GetUser get the info about a specific user by unique ID or username.
 	// Authentication is required, and the permission to read the users, unless the provided user ID is the same as the authenticated user.
@@ -154,11 +194,20 @@ type Client interface {
 
 	// CreateUser create a new user.
 	// Authentication is required, and the permission to manage the users.
-	CreateUser(username string, password string, status UserStatus, permissions *Permissions) (*UserInfoDetails, error)
+	CreateUser(
+		username string,
+		password string,
+		status UserStatus,
+		permissions *Permissions,
+	) (*UserInfoDetails, error)
 
 	// UpdateUser update a user by unique ID or username.
 	// Authentication is required, and the permission to manage the users.
-	UpdateUser(userID Identifier, username *string, status *UserStatus) error
+	UpdateUser(
+		userID Identifier,
+		username *string,
+		status *UserStatus,
+	) error
 
 	// UpdatePermissions update the permissions of a user by unique ID or username.
 	// Authentication is required, and the permission to manage the users.
@@ -166,7 +215,11 @@ type Client interface {
 
 	// ChangePassword change the password of a user by unique ID or username.
 	// Authentication is required, and the permission to manage the users, unless the provided user ID is the same as the authenticated user.
-	ChangePassword(userID Identifier, currentPassword string, newPassword string) error
+	ChangePassword(
+		userID Identifier,
+		currentPassword string,
+		newPassword string,
+	) error
 
 	// DeleteUser delete a user by unique ID or username.
 	// Authentication is required, and the permission to manage the users.
