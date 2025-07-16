@@ -129,8 +129,8 @@ if [ -f "README.md" ]; then
             continue
         fi
         # Add GOOS/GOARCH env if specified
-       [ -n "${GOOS}" ] && command="GOOS=${GOOS} ${command}"
-       [ -n "${GOARCH}" ] && command="GOARCH=${GOARCH} ${command}"
+        [ -n "${GOOS}" ] && command="GOOS=${GOOS} ${command}"
+        [ -n "${GOARCH}" ] && command="GOARCH=${GOARCH} ${command}"
 
         echo -e "\e[33mChecking example command from examples/go/README.md:\e[0m ${command}"
         echo ""
