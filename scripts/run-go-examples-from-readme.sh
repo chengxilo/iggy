@@ -119,6 +119,7 @@ done
 cd examples/go
 
 # Execute all example commands from examples/go/README.md and check if they pass or fail
+exit_code=0
 if [ -f "README.md" ]; then
     while IFS= read -r command; do
         # Remove backticks and comments from command
