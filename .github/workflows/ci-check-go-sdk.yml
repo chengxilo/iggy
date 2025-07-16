@@ -49,7 +49,7 @@ jobs:
   lint:
     strategy:
       matrix:
-        module: [ foreign/go, bdd/go ]
+        module: [ foreign/go, bdd/go, examples/go ]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
