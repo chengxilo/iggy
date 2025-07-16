@@ -28,6 +28,7 @@
     "foreign/go/go.mod",
     "foreign/go/go.sum",
     "bdd/go/.*\\.go",
+    "examples/go/.*\\.go",
     "bdd/go/go.mod",
     "bdd/go/go.sum",
     ".github/workflows/ci-check-go-sdk.yml"
