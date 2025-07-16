@@ -46,6 +46,11 @@ jobs:
       - name: Unit Test
         working-directory: foreign/go
         run: go test -v ./...
+
+      - name: Run and verify CLI commands from Go SDK examples README
+        working-directory: examples/go
+        run: ./scripts/run-go-examples-from-readme.sh
+
   lint:
     strategy:
       matrix:
