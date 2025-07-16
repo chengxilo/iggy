@@ -38,11 +38,14 @@ var (
 )
 
 func main() {
-	client, _ := iggycli.NewIggyClient(
+	client, err := iggycli.NewIggyClient(
 		iggycli.WithTcp(
 			tcp.WithServerAddress(getTcpServerAddr()),
 		),
 	)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	if _, err := client.LoginUser(common.DefaultRootUsername, common.DefaultRootPassword); err != nil {
 		log.Fatalf("Login failed: %v", err)
