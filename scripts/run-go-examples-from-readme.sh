@@ -19,7 +19,7 @@
 
 set -euo pipefail
 
-# Script to run Go examples from README.md and examples/go/README.md files
+# Script to run Go examples from examples/go/README.md files
 # Usage: ./scripts/run-go-examples-from-readme.sh [OPTIONS]
 #
 # --goos   - Optional target OS (e.g., linux, darwin)
@@ -27,7 +27,7 @@ set -euo pipefail
 # --target - Optional target architecture for rust (e.g., x86_64-unknown-linux-musl)
 # If not provided, uses the default target
 #
-# This script will run all the commands from both README.md and examples/go/README.md files
+# This script will run all the commands from examples/go/README.md files
 # and check if they pass or fail.
 # If any command fails, it will print the command and exit with non-zero status.
 # If all commands pass, it will remove the log file and exit with zero status.
