@@ -47,8 +47,7 @@ jobs:
         working-directory: foreign/go
         run: go test -v ./...
 
-      - name: Run and verify CLI commands from Go SDK examples README
-        working-directory: examples/go
+      - name: Run and Verify CLI Commands from Go SDK Examples README
         run: ./scripts/run-go-examples-from-readme.sh
 
   lint:
