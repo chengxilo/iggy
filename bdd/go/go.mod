@@ -6,6 +6,7 @@ replace github.com/apache/iggy/foreign/go => ../../foreign/go
 
 require (
 	github.com/apache/iggy/foreign/go v0.0.0-00010101000000-000000000000
+	github.com/cucumber/godog v0.15.0
 	github.com/google/uuid v1.6.0
 	github.com/onsi/ginkgo/v2 v2.23.4
 	github.com/onsi/gomega v1.37.0
@@ -13,7 +14,6 @@ require (
 
 require (
 	github.com/cucumber/gherkin/go/v26 v26.2.0 // indirect
-	github.com/cucumber/godog v0.15.0 // indirect
 	github.com/cucumber/messages/go/v21 v21.0.1 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
