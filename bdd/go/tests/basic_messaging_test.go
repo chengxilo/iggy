@@ -30,39 +30,38 @@ import (
 	"testing"
 )
 
-type (
-	serverAddrKeyType          struct{}
-	clientKeyType              struct{}
-	lastSentMessageKeyType     struct{}
-	lastPollMessagesKeyType    struct{}
-	lastStreamIDKeyType        struct{}
-	lastStreamNameKeyType      struct{}
-	lastTopicIDKeyType         struct{}
-	lastTopicNameKeyType       struct{}
-	lastTopicPartitionsKeyType struct{}
-)
+type basicMessagingCtxKeyType struct{}
 
-var (
-	ServerAddrKey          = serverAddrKeyType{}
-	ClientKey              = clientKeyType{}
-	LastSentMessageKey     = lastSentMessageKeyType{}
-	LastPollMessagesKey    = lastPollMessagesKeyType{}
-	LastStreamIDKey        = lastStreamIDKeyType{}
-	LastStreamNameKey      = lastStreamNameKeyType{}
-	LastTopicIDKey         = lastTopicIDKeyType{}
-	LastTopicNameKey       = lastTopicNameKeyType{}
-	LastTopicPartitionsKey = lastTopicPartitionsKeyType{}
-)
+var basicMessagingKey = basicMessagingCtxKeyType{}
+
+type basicMessagingCtx struct {
+	serverAddr          *string
+	client              iggycli.Client
+	lastSentMessage     *iggcon.IggyMessage
+	lastPollMessages    *iggcon.PolledMessage
+	lastStreamID        *uint32
+	lastStreamName      *string
+	lastTopicID         *uint32
+	lastTopicName       *string
+	lastTopicPartitions *uint32
+}
+
+func getBasicMessagingCtx(ctx context.Context) *basicMessagingCtx {
+	return ctx.Value(basicMessagingKey).(*basicMessagingCtx)
+}
 
 func givenRunningServer(ctx context.Context) (context.Context, error) {
+	c := getBasicMessagingCtx(ctx)
 	addr := os.Getenv("IGGY_TCP_ADDRESS")
 	if addr == "" {
 		addr = "127.0.0.1:8090"
 	}
-	return context.WithValue(ctx, ServerAddrKey, addr), nil
+	c.serverAddr = &addr
+	return ctx, nil
 }
 func givenAuthenticationAsRoot(ctx context.Context) (context.Context, error) {
-	serverAddr := ctx.Value(ServerAddrKey).(string)
+	c := getBasicMessagingCtx(ctx)
+	serverAddr := *c.serverAddr
 
 	client, err := iggycli.NewIggyClient(
 		iggycli.WithTcp(
@@ -81,7 +80,8 @@ func givenAuthenticationAsRoot(ctx context.Context) (context.Context, error) {
 		return ctx, fmt.Errorf("error logging in: %v", err)
 	}
 
-	return context.WithValue(ctx, ClientKey, client), nil
+	c.client = client
+	return ctx, nil
 }
 
 func whenSendMessages(
@@ -90,11 +90,7 @@ func whenSendMessages(
 	streamID uint32,
 	topicID uint32,
 	partitionID uint32) (context.Context, error) {
-	clientVal := ctx.Value(ClientKey)
-	if clientVal == nil {
-		return ctx, errors.New("client should be available")
-	}
-	client := clientVal.(iggycli.Client)
+	c := getBasicMessagingCtx(ctx)
 	messages, err := createTestMessages(messagesCount)
 	if err != nil {
 		return ctx, fmt.Errorf("error creating test messages: %w", err)
@@ -103,11 +99,12 @@ func whenSendMessages(
 	streamIdentifier, _ := iggcon.NewIdentifier(streamID)
 	topicIdentifier, _ := iggcon.NewIdentifier(topicID)
 	partitioning := iggcon.PartitionId(partitionID)
-	if err = client.SendMessages(streamIdentifier, topicIdentifier, partitioning, messages); err != nil {
+	if err = c.client.SendMessages(streamIdentifier, topicIdentifier, partitioning, messages); err != nil {
 		return ctx, fmt.Errorf("failed to sending messages: %w", err)
 	}
 
-	return context.WithValue(ctx, LastSentMessageKey, messages[len(messages)-1]), nil
+	c.lastSentMessage = &messages[len(messages)-1]
+	return ctx, nil
 }
 
 func createTestMessages(count uint32) ([]iggcon.IggyMessage, error) {
@@ -130,12 +127,12 @@ func whenPollMessages(
 	topicID uint32,
 	partitionID uint32,
 	startOffset uint64) (context.Context, error) {
-	client := ctx.Value(ClientKey).(iggycli.Client)
+	c := getBasicMessagingCtx(ctx)
 	consumer := iggcon.DefaultConsumer()
 	streamIdentifier, _ := iggcon.NewIdentifier(streamID)
 	topicIdentifier, _ := iggcon.NewIdentifier(topicID)
 	uint32PartitionID := partitionID
-	polledMessages, err := client.PollMessages(
+	polledMessages, err := c.client.PollMessages(
 		streamIdentifier,
 		topicIdentifier,
 		consumer,
@@ -147,7 +144,8 @@ func whenPollMessages(
 	if err != nil {
 		return ctx, fmt.Errorf("failed to poll messages: %w", err)
 	}
-	return context.WithValue(ctx, LastPollMessagesKey, polledMessages), nil
+	c.lastPollMessages = polledMessages
+	return ctx, nil
 }
 
 func thenMessageSentSuccessfully(ctx context.Context) (context.Context, error) {
@@ -155,7 +153,7 @@ func thenMessageSentSuccessfully(ctx context.Context) (context.Context, error) {
 }
 
 func thenShouldReceiveMessages(ctx context.Context, expectedCount uint32) (context.Context, error) {
-	polledMessages := ctx.Value(LastPollMessagesKey).(*iggcon.PolledMessage)
+	polledMessages := getBasicMessagingCtx(ctx).lastPollMessages
 	if uint32(len(polledMessages.Messages)) != expectedCount {
 		return ctx, fmt.Errorf("expected %d messages, but there is %d", expectedCount, len(polledMessages.Messages))
 	}
@@ -166,7 +164,7 @@ func thenMessagesHaveSequentialOffsets(
 	ctx context.Context,
 	startOffset uint64,
 	endOffset uint64) (context.Context, error) {
-	polledMessages := ctx.Value(LastPollMessagesKey).(*iggcon.PolledMessage)
+	polledMessages := getBasicMessagingCtx(ctx).lastPollMessages
 	for i, m := range polledMessages.Messages {
 		expectedOffset := startOffset + uint64(i)
 		if expectedOffset != m.Header.Offset {
@@ -181,7 +179,7 @@ func thenMessagesHaveSequentialOffsets(
 }
 
 func thenMessagesHaveExpectedPayload(ctx context.Context) (context.Context, error) {
-	polledMessages := ctx.Value(LastPollMessagesKey).(*iggcon.PolledMessage)
+	polledMessages := getBasicMessagingCtx(ctx).lastPollMessages
 	for i, m := range polledMessages.Messages {
 		expectedPayload := fmt.Sprintf("test message %d", i)
 		if expectedPayload != string(m.Payload) {
@@ -192,8 +190,9 @@ func thenMessagesHaveExpectedPayload(ctx context.Context) (context.Context, erro
 }
 
 func thenLastPolledMessageMatchesSent(ctx context.Context) (context.Context, error) {
-	polledMessages := ctx.Value(LastPollMessagesKey).(*iggcon.PolledMessage)
-	sentMessage := ctx.Value(LastSentMessageKey).(iggcon.IggyMessage)
+	c := getBasicMessagingCtx(ctx)
+	polledMessages := c.lastPollMessages
+	sentMessage := c.lastSentMessage
 	if len(polledMessages.Messages) == 0 {
 		return ctx, errors.New("should have at least one polled message")
 	}
@@ -211,7 +210,7 @@ func thenLastPolledMessageMatchesSent(ctx context.Context) (context.Context, err
 }
 
 func givenNoStreams(ctx context.Context) (context.Context, error) {
-	client := ctx.Value(ClientKey).(iggycli.Client)
+	client := getBasicMessagingCtx(ctx).client
 	streams, err := client.GetStreams()
 	if err != nil {
 		return ctx, fmt.Errorf("failed to get streams: %w", err)
@@ -225,18 +224,18 @@ func givenNoStreams(ctx context.Context) (context.Context, error) {
 }
 
 func whenCreateStream(ctx context.Context, streamID uint32, streamName string) (context.Context, error) {
-	client := ctx.Value(ClientKey).(iggycli.Client)
-	stream, err := client.CreateStream(streamName, &streamID)
+	c := getBasicMessagingCtx(ctx)
+	stream, err := c.client.CreateStream(streamName, &streamID)
 	if err != nil {
 		return ctx, fmt.Errorf("failed to create stream: %w", err)
 	}
-	ctx = context.WithValue(ctx, LastStreamIDKey, stream.Id)
-	ctx = context.WithValue(ctx, LastStreamNameKey, stream.Name)
+	c.lastStreamID = &stream.Id
+	c.lastStreamName = &stream.Name
 	return ctx, nil
 }
 
 func thenStreamCreatedSuccessfully(ctx context.Context) (context.Context, error) {
-	if ctx.Value(LastStreamIDKey) == nil {
+	if getBasicMessagingCtx(ctx).lastStreamID == nil {
 		return ctx, errors.New("stream should have been created")
 	}
 	return ctx, nil
@@ -246,8 +245,9 @@ func thenStreamHasIDAndName(
 	ctx context.Context,
 	expectedID uint32,
 	expectedName string) (context.Context, error) {
-	streamID := ctx.Value(LastStreamIDKey).(uint32)
-	streamName := ctx.Value(LastStreamNameKey).(string)
+	c := getBasicMessagingCtx(ctx)
+	streamID := *c.lastStreamID
+	streamName := *c.lastStreamName
 	if streamID != expectedID {
 		return ctx, fmt.Errorf("expected stream ID %d, got %d", expectedID, streamID)
 	}
@@ -263,10 +263,10 @@ func whenCreateTopic(
 	topicName string,
 	streamID uint32,
 	partitionsCount uint32) (context.Context, error) {
-	client := ctx.Value(ClientKey).(iggycli.Client)
+	c := getBasicMessagingCtx(ctx)
 	streamIdentifier, _ := iggcon.NewIdentifier(streamID)
 	uint32TopicID := topicID
-	topic, err := client.CreateTopic(
+	topic, err := c.client.CreateTopic(
 		streamIdentifier,
 		topicName,
 		partitionsCount,
@@ -280,15 +280,15 @@ func whenCreateTopic(
 		return ctx, fmt.Errorf("failed to create topic: %w", err)
 	}
 
-	ctx = context.WithValue(ctx, LastTopicIDKey, topicID)
-	ctx = context.WithValue(ctx, LastTopicNameKey, topic.Name)
-	ctx = context.WithValue(ctx, LastTopicPartitionsKey, topic.PartitionsCount)
+	c.lastTopicID = &topic.Id
+	c.lastTopicName = &topic.Name
+	c.lastTopicPartitions = &topic.PartitionsCount
 
 	return ctx, nil
 }
 
 func thenTopicCreatedSuccessfully(ctx context.Context) (context.Context, error) {
-	if ctx.Value(LastTopicIDKey) == nil {
+	if getBasicMessagingCtx(ctx).lastTopicID == nil {
 		return ctx, errors.New("topic should have been created")
 	}
 	return ctx, nil
@@ -297,8 +297,9 @@ func thenTopicHasIDAndName(
 	ctx context.Context,
 	expectedID uint32,
 	expectedName string) (context.Context, error) {
-	topicID := ctx.Value(LastTopicIDKey).(uint32)
-	topicName := ctx.Value(LastTopicNameKey).(string)
+	c := getBasicMessagingCtx(ctx)
+	topicID := *c.lastTopicID
+	topicName := *c.lastTopicName
 	if topicID != expectedID {
 		return ctx, fmt.Errorf("expected topic ID %d, got %d", expectedID, topicID)
 	}
@@ -309,7 +310,7 @@ func thenTopicHasIDAndName(
 }
 
 func thenTopicsHasPartitions(ctx context.Context, expectedTopicPartitions uint32) (context.Context, error) {
-	topicPartitions := ctx.Value(LastTopicPartitionsKey).(uint32)
+	topicPartitions := *getBasicMessagingCtx(ctx).lastTopicPartitions
 	if topicPartitions != expectedTopicPartitions {
 		return ctx, errors.New("topic should have expected number of partitions")
 	}
@@ -317,6 +318,9 @@ func thenTopicsHasPartitions(ctx context.Context, expectedTopicPartitions uint32
 }
 
 func initScenarios(sc *godog.ScenarioContext) {
+	sc.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
+		return context.WithValue(context.Background(), basicMessagingKey, &basicMessagingCtx{}), nil
+	})
 	sc.Step(`I have a running Iggy server`, givenRunningServer)
 	sc.Step(`I am authenticated as the root user`, givenAuthenticationAsRoot)
 	sc.Step(`^I send (\d+) messages to stream (\d+), topic (\d+), partition (\d+)$`, whenSendMessages)
