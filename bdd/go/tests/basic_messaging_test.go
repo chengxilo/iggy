@@ -30,9 +30,7 @@ import (
 	"testing"
 )
 
-type basicMessagingCtxKeyType struct{}
-
-var basicMessagingKey = basicMessagingCtxKeyType{}
+type basicMessagingCtxKey struct{}
 
 type basicMessagingCtx struct {
 	serverAddr          *string
@@ -47,7 +45,7 @@ type basicMessagingCtx struct {
 }
 
 func getBasicMessagingCtx(ctx context.Context) *basicMessagingCtx {
-	return ctx.Value(basicMessagingKey).(*basicMessagingCtx)
+	return ctx.Value(basicMessagingCtxKey{}).(*basicMessagingCtx)
 }
 
 func givenRunningServer(ctx context.Context) (context.Context, error) {
@@ -319,7 +317,7 @@ func thenTopicsHasPartitions(ctx context.Context, expectedTopicPartitions uint32
 
 func initScenarios(sc *godog.ScenarioContext) {
 	sc.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
-		return context.WithValue(context.Background(), basicMessagingKey, &basicMessagingCtx{}), nil
+		return context.WithValue(context.Background(), basicMessagingCtxKey{}, &basicMessagingCtx{}), nil
 	})
 	sc.Step(`I have a running Iggy server`, givenRunningServer)
 	sc.Step(`I am authenticated as the root user`, givenAuthenticationAsRoot)
