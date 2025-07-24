@@ -48,16 +48,16 @@ func getBasicMessagingCtx(ctx context.Context) *basicMessagingCtx {
 	return ctx.Value(basicMessagingCtxKey{}).(*basicMessagingCtx)
 }
 
-func givenRunningServer(ctx context.Context) (context.Context, error) {
+func givenRunningServer(ctx context.Context) error {
 	c := getBasicMessagingCtx(ctx)
 	addr := os.Getenv("IGGY_TCP_ADDRESS")
 	if addr == "" {
 		addr = "127.0.0.1:8090"
 	}
 	c.serverAddr = &addr
-	return ctx, nil
+	return nil
 }
-func givenAuthenticationAsRoot(ctx context.Context) (context.Context, error) {
+func givenAuthenticationAsRoot(ctx context.Context) error {
 	c := getBasicMessagingCtx(ctx)
 	serverAddr := *c.serverAddr
 
@@ -67,19 +67,19 @@ func givenAuthenticationAsRoot(ctx context.Context) (context.Context, error) {
 		),
 	)
 	if err != nil {
-		return ctx, fmt.Errorf("error creating client: %w", err)
+		return fmt.Errorf("error creating client: %w", err)
 	}
 
 	if err = client.Ping(); err != nil {
-		return ctx, fmt.Errorf("error pinging client: %w", err)
+		return fmt.Errorf("error pinging client: %w", err)
 	}
 
 	if _, err = client.LoginUser("iggy", "iggy"); err != nil {
-		return ctx, fmt.Errorf("error logging in: %v", err)
+		return fmt.Errorf("error logging in: %v", err)
 	}
 
 	c.client = client
-	return ctx, nil
+	return nil
 }
 
 func whenSendMessages(
@@ -87,22 +87,22 @@ func whenSendMessages(
 	messagesCount uint32,
 	streamID uint32,
 	topicID uint32,
-	partitionID uint32) (context.Context, error) {
+	partitionID uint32) error {
 	c := getBasicMessagingCtx(ctx)
 	messages, err := createTestMessages(messagesCount)
 	if err != nil {
-		return ctx, fmt.Errorf("error creating test messages: %w", err)
+		return fmt.Errorf("error creating test messages: %w", err)
 	}
 
 	streamIdentifier, _ := iggcon.NewIdentifier(streamID)
 	topicIdentifier, _ := iggcon.NewIdentifier(topicID)
 	partitioning := iggcon.PartitionId(partitionID)
 	if err = c.client.SendMessages(streamIdentifier, topicIdentifier, partitioning, messages); err != nil {
-		return ctx, fmt.Errorf("failed to sending messages: %w", err)
+		return fmt.Errorf("failed to sending messages: %w", err)
 	}
 
 	c.lastSentMessage = &messages[len(messages)-1]
-	return ctx, nil
+	return nil
 }
 
 func createTestMessages(count uint32) ([]iggcon.IggyMessage, error) {
@@ -124,7 +124,7 @@ func whenPollMessages(
 	streamID uint32,
 	topicID uint32,
 	partitionID uint32,
-	startOffset uint64) (context.Context, error) {
+	startOffset uint64) error {
 	c := getBasicMessagingCtx(ctx)
 	consumer := iggcon.DefaultConsumer()
 	streamIdentifier, _ := iggcon.NewIdentifier(streamID)
@@ -140,119 +140,119 @@ func whenPollMessages(
 		&uint32PartitionID,
 	)
 	if err != nil {
-		return ctx, fmt.Errorf("failed to poll messages: %w", err)
+		return fmt.Errorf("failed to poll messages: %w", err)
 	}
 	c.lastPollMessages = polledMessages
-	return ctx, nil
+	return nil
 }
 
-func thenMessageSentSuccessfully(ctx context.Context) (context.Context, error) {
-	return ctx, nil
+func thenMessageSentSuccessfully(_ context.Context) error {
+	return nil
 }
 
-func thenShouldReceiveMessages(ctx context.Context, expectedCount uint32) (context.Context, error) {
+func thenShouldReceiveMessages(ctx context.Context, expectedCount uint32) error {
 	polledMessages := getBasicMessagingCtx(ctx).lastPollMessages
 	if uint32(len(polledMessages.Messages)) != expectedCount {
-		return ctx, fmt.Errorf("expected %d messages, but there is %d", expectedCount, len(polledMessages.Messages))
+		return fmt.Errorf("expected %d messages, but there is %d", expectedCount, len(polledMessages.Messages))
 	}
-	return ctx, nil
+	return nil
 }
 
 func thenMessagesHaveSequentialOffsets(
 	ctx context.Context,
 	startOffset uint64,
-	endOffset uint64) (context.Context, error) {
+	endOffset uint64) error {
 	polledMessages := getBasicMessagingCtx(ctx).lastPollMessages
 	for i, m := range polledMessages.Messages {
 		expectedOffset := startOffset + uint64(i)
 		if expectedOffset != m.Header.Offset {
-			return ctx, fmt.Errorf("message at index %d should have offset %d", i, expectedOffset)
+			return fmt.Errorf("message at index %d should have offset %d", i, expectedOffset)
 		}
 	}
 	lastMessage := polledMessages.Messages[len(polledMessages.Messages)-1]
 	if lastMessage.Header.Offset != endOffset {
-		return ctx, fmt.Errorf("last message should have offset %d", endOffset)
+		return fmt.Errorf("last message should have offset %d", endOffset)
 	}
-	return ctx, nil
+	return nil
 }
 
-func thenMessagesHaveExpectedPayload(ctx context.Context) (context.Context, error) {
+func thenMessagesHaveExpectedPayload(ctx context.Context) error {
 	polledMessages := getBasicMessagingCtx(ctx).lastPollMessages
 	for i, m := range polledMessages.Messages {
 		expectedPayload := fmt.Sprintf("test message %d", i)
 		if expectedPayload != string(m.Payload) {
-			return ctx, fmt.Errorf("message at offset %d should have payload '%s'", i, expectedPayload)
+			return fmt.Errorf("message at offset %d should have payload '%s'", i, expectedPayload)
 		}
 	}
-	return ctx, nil
+	return nil
 }
 
-func thenLastPolledMessageMatchesSent(ctx context.Context) (context.Context, error) {
+func thenLastPolledMessageMatchesSent(ctx context.Context) error {
 	c := getBasicMessagingCtx(ctx)
 	polledMessages := c.lastPollMessages
 	sentMessage := c.lastSentMessage
 	if len(polledMessages.Messages) == 0 {
-		return ctx, errors.New("should have at least one polled message")
+		return errors.New("should have at least one polled message")
 	}
 
 	lastPolled := polledMessages.Messages[len(polledMessages.Messages)-1]
 
 	if lastPolled.Header.Id != sentMessage.Header.Id {
-		return ctx, fmt.Errorf("message IDs should match: sent %d, polled %d", sentMessage.Header.Id, lastPolled.Header.Id)
+		return fmt.Errorf("message IDs should match: sent %d, polled %d", sentMessage.Header.Id, lastPolled.Header.Id)
 	}
 
 	if string(lastPolled.Payload) != string(sentMessage.Payload) {
-		return ctx, fmt.Errorf("message payload should match: sent %s, polled %s", sentMessage.Payload, lastPolled.Header.Id)
+		return fmt.Errorf("message payload should match: sent %s, polled %s", sentMessage.Payload, lastPolled.Header.Id)
 	}
-	return ctx, nil
+	return nil
 }
 
-func givenNoStreams(ctx context.Context) (context.Context, error) {
+func givenNoStreams(ctx context.Context) error {
 	client := getBasicMessagingCtx(ctx).client
 	streams, err := client.GetStreams()
 	if err != nil {
-		return ctx, fmt.Errorf("failed to get streams: %w", err)
+		return fmt.Errorf("failed to get streams: %w", err)
 	}
 
 	if len(streams) != 0 {
-		return ctx, errors.New("system should have no stream initially")
+		return errors.New("system should have no stream initially")
 	}
 
-	return ctx, err
+	return err
 }
 
-func whenCreateStream(ctx context.Context, streamID uint32, streamName string) (context.Context, error) {
+func whenCreateStream(ctx context.Context, streamID uint32, streamName string) error {
 	c := getBasicMessagingCtx(ctx)
 	stream, err := c.client.CreateStream(streamName, &streamID)
 	if err != nil {
-		return ctx, fmt.Errorf("failed to create stream: %w", err)
+		return fmt.Errorf("failed to create stream: %w", err)
 	}
 	c.lastStreamID = &stream.Id
 	c.lastStreamName = &stream.Name
-	return ctx, nil
+	return nil
 }
 
-func thenStreamCreatedSuccessfully(ctx context.Context) (context.Context, error) {
+func thenStreamCreatedSuccessfully(ctx context.Context) error {
 	if getBasicMessagingCtx(ctx).lastStreamID == nil {
-		return ctx, errors.New("stream should have been created")
+		return errors.New("stream should have been created")
 	}
-	return ctx, nil
+	return nil
 }
 
 func thenStreamHasIDAndName(
 	ctx context.Context,
 	expectedID uint32,
-	expectedName string) (context.Context, error) {
+	expectedName string) error {
 	c := getBasicMessagingCtx(ctx)
 	streamID := *c.lastStreamID
 	streamName := *c.lastStreamName
 	if streamID != expectedID {
-		return ctx, fmt.Errorf("expected stream ID %d, got %d", expectedID, streamID)
+		return fmt.Errorf("expected stream ID %d, got %d", expectedID, streamID)
 	}
 	if streamName != expectedName {
-		return ctx, fmt.Errorf("expected stream name %s, got %s", expectedName, streamName)
+		return fmt.Errorf("expected stream name %s, got %s", expectedName, streamName)
 	}
-	return ctx, nil
+	return nil
 }
 
 func whenCreateTopic(
@@ -260,7 +260,7 @@ func whenCreateTopic(
 	topicID uint32,
 	topicName string,
 	streamID uint32,
-	partitionsCount uint32) (context.Context, error) {
+	partitionsCount uint32) error {
 	c := getBasicMessagingCtx(ctx)
 	streamIdentifier, _ := iggcon.NewIdentifier(streamID)
 	uint32TopicID := topicID
@@ -275,44 +275,44 @@ func whenCreateTopic(
 		&uint32TopicID,
 	)
 	if err != nil {
-		return ctx, fmt.Errorf("failed to create topic: %w", err)
+		return fmt.Errorf("failed to create topic: %w", err)
 	}
 
 	c.lastTopicID = &topic.Id
 	c.lastTopicName = &topic.Name
 	c.lastTopicPartitions = &topic.PartitionsCount
 
-	return ctx, nil
+	return nil
 }
 
-func thenTopicCreatedSuccessfully(ctx context.Context) (context.Context, error) {
+func thenTopicCreatedSuccessfully(ctx context.Context) error {
 	if getBasicMessagingCtx(ctx).lastTopicID == nil {
-		return ctx, errors.New("topic should have been created")
+		return errors.New("topic should have been created")
 	}
-	return ctx, nil
+	return nil
 }
 func thenTopicHasIDAndName(
 	ctx context.Context,
 	expectedID uint32,
-	expectedName string) (context.Context, error) {
+	expectedName string) error {
 	c := getBasicMessagingCtx(ctx)
 	topicID := *c.lastTopicID
 	topicName := *c.lastTopicName
 	if topicID != expectedID {
-		return ctx, fmt.Errorf("expected topic ID %d, got %d", expectedID, topicID)
+		return fmt.Errorf("expected topic ID %d, got %d", expectedID, topicID)
 	}
 	if topicName != expectedName {
-		return ctx, fmt.Errorf("expected topic name %s, got %s", expectedName, topicName)
+		return fmt.Errorf("expected topic name %s, got %s", expectedName, topicName)
 	}
-	return ctx, nil
+	return nil
 }
 
-func thenTopicsHasPartitions(ctx context.Context, expectedTopicPartitions uint32) (context.Context, error) {
+func thenTopicsHasPartitions(ctx context.Context, expectedTopicPartitions uint32) error {
 	topicPartitions := *getBasicMessagingCtx(ctx).lastTopicPartitions
 	if topicPartitions != expectedTopicPartitions {
-		return ctx, errors.New("topic should have expected number of partitions")
+		return errors.New("topic should have expected number of partitions")
 	}
-	return ctx, nil
+	return nil
 }
 
 func initScenarios(sc *godog.ScenarioContext) {
