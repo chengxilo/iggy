@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-name: publish_go_sdk
+name: ci-publish-go
 on:
   push:
     tags:
