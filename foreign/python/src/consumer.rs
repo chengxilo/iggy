@@ -31,7 +31,7 @@ use pyo3::types::{PyDelta, PyDeltaAccess, PyFunction};
 use pyo3::{prelude::*, type_object};
 use pyo3_async_runtimes::tokio::{future_into_py, get_runtime, into_future, scope};
 use pyo3_async_runtimes::TaskLocals;
-use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pymethods};
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pyclass_complex_enum, gen_stub_pymethods};
 use pyo3_stub_gen::PyStubType;
 use tokio::sync::oneshot::Sender;
 use tokio::sync::Mutex;
@@ -53,36 +53,36 @@ pub struct IggyConsumer {
 #[pymethods]
 impl IggyConsumer {
     /// Get the last consumed offset or `None` if no offset has been consumed yet.
-    fn get_last_consumed_offset<'a>(&self, partition_id: u32) -> Option<u64> {
+    fn get_last_consumed_offset(&self, partition_id: u32) -> Option<u64> {
         self.inner
             .blocking_lock()
             .get_last_consumed_offset(partition_id)
     }
 
     /// Get the last stored offset or `None` if no offset has been stored yet.
-    fn get_last_stored_offset<'a>(&self, partition_id: u32) -> Option<u64> {
+    fn get_last_stored_offset(&self, partition_id: u32) -> Option<u64> {
         self.inner
             .blocking_lock()
             .get_last_stored_offset(partition_id)
     }
 
     /// Gets the name of the consumer group.
-    fn name<'a>(&self) -> String {
+    fn name(&self) -> String {
         self.inner.blocking_lock().name().to_string()
     }
 
     /// Gets the current partition id or `0` if no messages have been polled yet.
-    fn partition_id<'a>(&self) -> u32 {
+    fn partition_id(&self) -> u32 {
         self.inner.blocking_lock().partition_id()
     }
 
     /// Gets the name of the stream this consumer group is configured for.
-    fn stream<'a>(&self) -> PyIdentifier {
+    fn stream(&self) -> PyIdentifier {
         self.inner.blocking_lock().stream().into()
     }
 
     /// Gets the name of the topic this consumer group is configured for.
-    fn topic<'a>(&self) -> PyIdentifier {
+    fn topic(&self) -> PyIdentifier {
         self.inner.blocking_lock().topic().into()
     }
 
@@ -141,7 +141,7 @@ impl IggyConsumer {
         let inner = self.inner.clone();
         let callback: Py<PyMessageCallback> = callback.unbind();
         let shutdown_event: Option<Py<PyAsyncioEvent>> =
-            shutdown_event.and_then(|e| Some(e.unbind()));
+            shutdown_event.map(|e| e.unbind());
 
         future_into_py(py, async {
             let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
@@ -199,7 +199,7 @@ impl IggyConsumer {
                 consume_result = handle_consume.await;
             }
 
-            let _ = consume_result
+            consume_result
                 .unwrap()
                 .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{e:?}")))?;
             Ok(())
@@ -313,7 +313,7 @@ impl PyStubType for PyAsyncioEvent {
 
 /// The auto-commit configuration for storing the offset on the server.
 // #[derive(Debug, PartialEq, Copy, Clone)]
-#[gen_stub_pyclass_enum]
+#[gen_stub_pyclass_complex_enum]
 #[pyclass]
 pub enum AutoCommit {
     /// The auto-commit is disabled and the offset must be stored manually by the consumer.
@@ -330,9 +330,9 @@ pub enum AutoCommit {
     After(AutoCommitAfter),
 }
 
-impl Into<RustAutoCommit> for &AutoCommit {
-    fn into(self) -> RustAutoCommit {
-        match self {
+impl From<&AutoCommit> for RustAutoCommit {
+    fn from(val: &AutoCommit) -> RustAutoCommit {
+        match val {
             AutoCommit::Disabled() => RustAutoCommit::Disabled,
             AutoCommit::Interval(delta) => {
                 let duration = py_delta_to_iggy_duration(delta);
@@ -354,7 +354,7 @@ impl Into<RustAutoCommit> for &AutoCommit {
 
 /// The auto-commit mode for storing the offset on the server.
 #[derive(Debug, PartialEq, Copy, Clone)]
-#[gen_stub_pyclass_enum]
+#[gen_stub_pyclass_complex_enum]
 #[pyclass]
 pub enum AutoCommitWhen {
     /// The offset is stored on the server when the messages are received.
@@ -367,9 +367,9 @@ pub enum AutoCommitWhen {
     ConsumingEveryNthMessage(u32),
 }
 
-impl Into<RustAutoCommitWhen> for &AutoCommitWhen {
-    fn into(self) -> RustAutoCommitWhen {
-        match self {
+impl From<&AutoCommitWhen> for RustAutoCommitWhen {
+    fn from(val: &AutoCommitWhen) -> RustAutoCommitWhen {
+        match val {
             AutoCommitWhen::PollingMessages() => RustAutoCommitWhen::PollingMessages,
             AutoCommitWhen::ConsumingAllMessages() => RustAutoCommitWhen::ConsumingAllMessages,
             AutoCommitWhen::ConsumingEachMessage() => RustAutoCommitWhen::ConsumingEachMessage,
@@ -382,8 +382,9 @@ impl Into<RustAutoCommitWhen> for &AutoCommitWhen {
 
 /// The auto-commit mode for storing the offset on the server **after** receiving the messages.
 #[derive(Debug, PartialEq, Copy, Clone)]
-#[gen_stub_pyclass_enum]
+#[gen_stub_pyclass_complex_enum]
 #[pyclass]
+#[allow(clippy::enum_variant_names)]
 pub enum AutoCommitAfter {
     /// The offset is stored on the server after all the messages are consumed.
     ConsumingAllMessages(),
@@ -393,9 +394,9 @@ pub enum AutoCommitAfter {
     ConsumingEveryNthMessage(u32),
 }
 
-impl Into<RustAutoCommitAfter> for &AutoCommitAfter {
-    fn into(self) -> RustAutoCommitAfter {
-        match self {
+impl From<&AutoCommitAfter> for RustAutoCommitAfter {
+    fn from(val: &AutoCommitAfter) -> RustAutoCommitAfter {
+        match val {
             AutoCommitAfter::ConsumingAllMessages() => RustAutoCommitAfter::ConsumingAllMessages,
             AutoCommitAfter::ConsumingEachMessage() => RustAutoCommitAfter::ConsumingEachMessage,
             AutoCommitAfter::ConsumingEveryNthMessage(n) => {
