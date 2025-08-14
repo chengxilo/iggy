@@ -65,6 +65,7 @@ var _ = ginkgo.Describe("GET STREAM BY ID:", func() {
 				math.MaxUint64,
 				nil,
 				&t1Id)
+			itShouldNotReturnError(err)
 			_, err = client.CreateTopic(
 				streamIdentifier,
 				t2Name,
@@ -74,6 +75,7 @@ var _ = ginkgo.Describe("GET STREAM BY ID:", func() {
 				math.MaxUint64,
 				nil,
 				&t2Id)
+			itShouldNotReturnError(err)
 			itShouldSuccessfullyCreateTopic(streamId, t1Id, t1Name, client)
 			itShouldSuccessfullyCreateTopic(streamId, t2Id, t2Name, client)
 
