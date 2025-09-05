@@ -35,7 +35,7 @@ func WithMsg(msg string) Option {
 	}
 }
 
-// New returns a new IggyError from Code.
+// New returns a new IggyError
 func New(code ErrCode, opts ...Option) *IggyError {
 	err := &IggyError{
 		Code: code,
