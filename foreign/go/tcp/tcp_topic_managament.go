@@ -67,7 +67,7 @@ func (tms *IggyTcpClient) CreateTopic(
 	if len(name) == 0 || len(name) > MaxStringLength {
 		return nil, ierror.New(ierror.InvalidTopicName)
 	}
-	if partitionsCount < 0 || partitionsCount > MaxPartitionCount {
+	if partitionsCount > MaxPartitionCount {
 		return nil, ierror.New(ierror.TooManyPartitions)
 	}
 	if replicationFactor != nil && *replicationFactor == 0 {
