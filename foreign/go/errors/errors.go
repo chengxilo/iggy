@@ -65,7 +65,7 @@ func (e *IggyError) Is(target error) bool {
 // It supports wrapped errors.
 func Code(err error) ErrCode {
 	if err == nil {
-		return 0
+		return OK
 	}
 	return FromError(err).Code
 }
