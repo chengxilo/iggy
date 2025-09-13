@@ -50,7 +50,7 @@ var _ = ginkgo.Describe("CREATE STREAM:", func() {
 			anotherStreamId := createRandomUInt32()
 			_, err = client.CreateStream(name, &anotherStreamId)
 
-			itShouldReturnErrorWithSpecificCode(err, ierror.StreamNameAlreadyExists)
+			itShouldReturnSpecificError(err, ierror.ErrStreamNameAlreadyExists)
 		})
 
 		ginkgo.Context("and tries to create stream with duplicate stream id", func() {
@@ -66,7 +66,7 @@ var _ = ginkgo.Describe("CREATE STREAM:", func() {
 
 			_, err = client.CreateStream(createRandomString(32), &streamId)
 
-			itShouldReturnErrorWithSpecificCode(err, ierror.StreamIdAlreadyExists)
+			itShouldReturnSpecificError(err, ierror.ErrStreamIdAlreadyExists)
 		})
 
 		ginkgo.Context("and tries to create stream name that's over 255 characters", func() {
@@ -76,7 +76,7 @@ var _ = ginkgo.Describe("CREATE STREAM:", func() {
 
 			_, err := client.CreateStream(name, &streamId)
 
-			itShouldReturnErrorWithSpecificCode(err, ierror.InvalidStreamName)
+			itShouldReturnSpecificError(err, ierror.ErrInvalidStreamName)
 		})
 	})
 

@@ -121,7 +121,7 @@ func itShouldSuccessfullyDeletedConsumer(streamId uint32, topicId uint32, groupI
 	topicIdentifier, _ := iggcon.NewIdentifier(topicId)
 	groupIdentifier, _ := iggcon.NewIdentifier(groupId)
 	consumer, err := client.GetConsumerGroup(streamIdentifier, topicIdentifier, groupIdentifier)
-	itShouldReturnErrorWithSpecificCode(err, ierror.ConsumerGroupIdNotFound)
+	itShouldReturnSpecificError(err, ierror.ErrConsumerGroupIdNotFound)
 	ginkgo.It("should not return consumer", func() {
 		gomega.Expect(consumer).To(gomega.BeNil())
 	})

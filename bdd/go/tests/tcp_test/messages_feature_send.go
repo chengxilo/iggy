@@ -56,7 +56,7 @@ var _ = ginkgo.Describe("SEND MESSAGES:", func() {
 				iggcon.None(),
 				messages,
 			)
-			itShouldReturnErrorWithSpecificCode(err, ierror.TopicIdNotFound)
+			itShouldReturnSpecificError(err, ierror.ErrTopicIdNotFound)
 		})
 
 		ginkgo.Context("and tries to send messages to the non existing stream", func() {
@@ -68,7 +68,7 @@ var _ = ginkgo.Describe("SEND MESSAGES:", func() {
 				iggcon.None(),
 				messages,
 			)
-			itShouldReturnErrorWithSpecificCode(err, ierror.StreamIdNotFound)
+			itShouldReturnSpecificError(err, ierror.ErrStreamIdNotFound)
 		})
 
 		ginkgo.Context("and tries to send messages to non existing partition", func() {
@@ -85,7 +85,7 @@ var _ = ginkgo.Describe("SEND MESSAGES:", func() {
 				iggcon.PartitionId(createRandomUInt32()),
 				messages,
 			)
-			itShouldReturnErrorWithSpecificCode(err, ierror.PartitionNotFound)
+			itShouldReturnSpecificError(err, ierror.ErrPartitionNotFound)
 		})
 
 		ginkgo.Context("and tries to send messages to valid topic but with 0 messages in payload", func() {
@@ -101,7 +101,7 @@ var _ = ginkgo.Describe("SEND MESSAGES:", func() {
 				iggcon.PartitionId(createRandomUInt32()),
 				[]iggcon.IggyMessage{},
 			)
-			itShouldReturnErrorWithSpecificCode(err, ierror.InvalidMessagesCount)
+			itShouldReturnSpecificError(err, ierror.ErrInvalidMessagesCount)
 		})
 	})
 

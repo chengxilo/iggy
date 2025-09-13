@@ -67,7 +67,7 @@ var _ = ginkgo.Describe("UPDATE TOPIC:", func() {
 				math.MaxUint64,
 				&replicationFactor)
 
-			itShouldReturnErrorWithSpecificCode(err, ierror.TopicNameAlreadyExists)
+			itShouldReturnSpecificError(err, ierror.ErrTopicNameAlreadyExists)
 		})
 
 		ginkgo.Context("and tries to update non-existing topic", func() {
@@ -82,7 +82,7 @@ var _ = ginkgo.Describe("UPDATE TOPIC:", func() {
 				math.MaxUint64,
 				&replicationFactor)
 
-			itShouldReturnErrorWithSpecificCode(err, ierror.StreamIdNotFound)
+			itShouldReturnSpecificError(err, ierror.ErrStreamIdNotFound)
 		})
 
 		ginkgo.Context("and tries to update non-existing stream", func() {
@@ -100,7 +100,7 @@ var _ = ginkgo.Describe("UPDATE TOPIC:", func() {
 				math.MaxUint64,
 				&replicationFactor)
 
-			itShouldReturnErrorWithSpecificCode(err, ierror.TopicIdNotFound)
+			itShouldReturnSpecificError(err, ierror.ErrTopicIdNotFound)
 		})
 
 		ginkgo.Context("and tries to update existing topic with a name that's over 255 characters", func() {
@@ -120,7 +120,7 @@ var _ = ginkgo.Describe("UPDATE TOPIC:", func() {
 				math.MaxUint64,
 				&replicationFactor)
 
-			itShouldReturnErrorWithSpecificCode(err, ierror.InvalidTopicName)
+			itShouldReturnSpecificError(err, ierror.ErrInvalidTopicName)
 		})
 	})
 

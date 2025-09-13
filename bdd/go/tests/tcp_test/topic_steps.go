@@ -127,7 +127,7 @@ func itShouldSuccessfullyDeleteTopic(streamId uint32, topicId uint32, client igg
 	topicIdentifier, _ := iggcon.NewIdentifier(topicId)
 	topic, err := client.GetTopic(streamIdentifier, topicIdentifier)
 
-	itShouldReturnErrorWithSpecificCode(err, ierror.TopicIdNotFound)
+	itShouldReturnSpecificError(err, ierror.ErrTopicIdNotFound)
 	ginkgo.It("should not return topic", func() {
 		gomega.Expect(topic).To(gomega.BeNil())
 	})

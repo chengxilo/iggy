@@ -55,7 +55,7 @@ var _ = ginkgo.Describe("CREATE CONSUMER GROUP:", func() {
 				createRandomString(16),
 				&groupId)
 
-			itShouldReturnErrorWithSpecificCode(err, ierror.StreamIdNotFound)
+			itShouldReturnSpecificError(err, ierror.ErrStreamIdNotFound)
 		})
 
 		ginkgo.Context("and tries to create consumer group for a non existing topic", func() {
@@ -71,7 +71,7 @@ var _ = ginkgo.Describe("CREATE CONSUMER GROUP:", func() {
 				&groupId,
 			)
 
-			itShouldReturnErrorWithSpecificCode(err, ierror.TopicIdNotFound)
+			itShouldReturnSpecificError(err, ierror.ErrTopicIdNotFound)
 		})
 
 		ginkgo.Context("and tries to create consumer group with duplicate group name", func() {
@@ -90,7 +90,7 @@ var _ = ginkgo.Describe("CREATE CONSUMER GROUP:", func() {
 				name,
 				&groupId,
 			)
-			itShouldReturnErrorWithSpecificCode(err, ierror.ConsumerGroupNameAlreadyExists)
+			itShouldReturnSpecificError(err, ierror.ErrConsumerGroupNameAlreadyExists)
 		})
 
 		ginkgo.Context("and tries to create consumer group with duplicate group id", func() {
@@ -108,7 +108,7 @@ var _ = ginkgo.Describe("CREATE CONSUMER GROUP:", func() {
 				createRandomString(16),
 				&groupId)
 
-			itShouldReturnErrorWithSpecificCode(err, ierror.ConsumerGroupIdAlreadyExists)
+			itShouldReturnSpecificError(err, ierror.ErrConsumerGroupIdAlreadyExists)
 		})
 
 		ginkgo.Context("and tries to create group with name that's over 255 characters", func() {
@@ -126,7 +126,7 @@ var _ = ginkgo.Describe("CREATE CONSUMER GROUP:", func() {
 				createRandomString(256),
 				&groupId)
 
-			itShouldReturnErrorWithSpecificCode(err, ierror.InvalidConsumerGroupName)
+			itShouldReturnSpecificError(err, ierror.ErrInvalidConsumerGroupName)
 		})
 	})
 

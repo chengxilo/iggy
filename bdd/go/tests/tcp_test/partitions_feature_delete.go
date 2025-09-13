@@ -52,7 +52,7 @@ var _ = ginkgo.Describe("DELETE PARTITION:", func() {
 				10,
 			)
 
-			itShouldReturnErrorWithSpecificCode(err, ierror.StreamIdNotFound)
+			itShouldReturnSpecificError(err, ierror.ErrStreamIdNotFound)
 		})
 
 		ginkgo.Context("and tries to delete partitions for a non existing topic", func() {
@@ -66,7 +66,7 @@ var _ = ginkgo.Describe("DELETE PARTITION:", func() {
 				10,
 			)
 
-			itShouldReturnErrorWithSpecificCode(err, ierror.TopicIdNotFound)
+			itShouldReturnSpecificError(err, ierror.ErrTopicIdNotFound)
 		})
 	})
 

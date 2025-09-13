@@ -18,19 +18,21 @@
 package tcp_test
 
 import (
+	"errors"
+
 	ierror "github.com/apache/iggy/foreign/go/errors"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
-func itShouldReturnErrorWithSpecificCode(err error, code ierror.ErrCode) {
-	ginkgo.It("Should return error: "+code.String(), func() {
-		gomega.Expect(ierror.Code(err)).To(gomega.Equal(code))
+func itShouldReturnSpecificError(err error, expected error) {
+	ginkgo.It("Should return error: "+expected.Error(), func() {
+		gomega.Expect(errors.Is(err, expected)).To(gomega.BeTrue())
 	})
 }
 
 func itShouldReturnUnauthenticatedError(err error) {
-	itShouldReturnErrorWithSpecificCode(err, ierror.Unauthenticated)
+	itShouldReturnSpecificError(err, ierror.ErrUnauthenticated)
 }
 
 func itShouldNotReturnError(err error) {

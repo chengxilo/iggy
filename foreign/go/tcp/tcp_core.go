@@ -162,13 +162,11 @@ func (tms *IggyTcpClient) sendAndFetchResponse(message []byte, command iggcon.Co
 	}
 
 	if readBytes != ResponseInitialBytesLength {
-		return nil, fmt.Errorf(
-			"received an invalid or empty response: %w",
-			ierror.New(ierror.EmptyResponse))
+		return nil, fmt.Errorf("received an invalid or empty response: %w", ierror.EmptyResponse{})
 	}
 
-	if status := ierror.ErrCode(binary.LittleEndian.Uint32(buffer[0:4])); status != ierror.OK {
-		return nil, ierror.New(status)
+	if status := ierror.Code(binary.LittleEndian.Uint32(buffer[0:4])); status != 0 {
+		return nil, ierror.FromCode(status)
 	}
 
 	length := int(binary.LittleEndian.Uint32(buffer[4:]))

@@ -67,7 +67,7 @@ var _ = ginkgo.Describe("CREATE TOPIC:", func() {
 				&replicationFactor,
 				&topicId)
 
-			itShouldReturnErrorWithSpecificCode(err, ierror.StreamIdNotFound)
+			itShouldReturnSpecificError(err, ierror.ErrStreamIdNotFound)
 		})
 
 		ginkgo.Context("and tries to create topic with duplicate topic name", func() {
@@ -88,7 +88,7 @@ var _ = ginkgo.Describe("CREATE TOPIC:", func() {
 				math.MaxUint64,
 				&replicationFactor,
 				&topicId)
-			itShouldReturnErrorWithSpecificCode(err, ierror.TopicNameAlreadyExists)
+			itShouldReturnSpecificError(err, ierror.ErrTopicNameAlreadyExists)
 		})
 
 		ginkgo.Context("and tries to create topic with duplicate topic id", func() {
@@ -107,7 +107,7 @@ var _ = ginkgo.Describe("CREATE TOPIC:", func() {
 				math.MaxUint64,
 				&replicationFactor,
 				&topicId)
-			itShouldReturnErrorWithSpecificCode(err, ierror.TopicIdAlreadyExists)
+			itShouldReturnSpecificError(err, ierror.ErrTopicIdAlreadyExists)
 		})
 
 		ginkgo.Context("and tries to create topic with name that's over 255 characters", func() {
@@ -128,7 +128,7 @@ var _ = ginkgo.Describe("CREATE TOPIC:", func() {
 				&replicationFactor,
 				&topicId)
 
-			itShouldReturnErrorWithSpecificCode(err, ierror.InvalidTopicName)
+			itShouldReturnSpecificError(err, ierror.ErrInvalidTopicName)
 		})
 	})
 

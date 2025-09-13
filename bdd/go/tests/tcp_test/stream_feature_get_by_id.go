@@ -45,7 +45,7 @@ var _ = ginkgo.Describe("GET STREAM BY ID:", func() {
 
 			_, err := client.GetStream(randomU32Identifier())
 
-			itShouldReturnErrorWithSpecificCode(err, ierror.StreamIdNotFound)
+			itShouldReturnSpecificError(err, ierror.ErrStreamIdNotFound)
 		})
 
 		ginkgo.Context("and tries to get stream after creating some topics", func() {

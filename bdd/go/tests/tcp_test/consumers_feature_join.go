@@ -58,7 +58,7 @@ var _ = ginkgo.Describe("JOIN CONSUMER GROUP:", func() {
 				randomU32Identifier(),
 			)
 
-			itShouldReturnErrorWithSpecificCode(err, ierror.ConsumerGroupIdNotFound)
+			itShouldReturnSpecificError(err, ierror.ErrConsumerGroupIdNotFound)
 		})
 
 		ginkgo.Context("and tries to join consumer non-existing topic", func() {
@@ -72,7 +72,7 @@ var _ = ginkgo.Describe("JOIN CONSUMER GROUP:", func() {
 				randomU32Identifier(),
 			)
 
-			itShouldReturnErrorWithSpecificCode(err, ierror.TopicIdNotFound)
+			itShouldReturnSpecificError(err, ierror.ErrTopicIdNotFound)
 		})
 
 		ginkgo.Context("and tries to join consumer for non-existing topic and stream", func() {
@@ -83,7 +83,7 @@ var _ = ginkgo.Describe("JOIN CONSUMER GROUP:", func() {
 				randomU32Identifier(),
 			)
 
-			itShouldReturnErrorWithSpecificCode(err, ierror.StreamIdNotFound)
+			itShouldReturnSpecificError(err, ierror.ErrStreamIdNotFound)
 		})
 	})
 

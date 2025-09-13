@@ -40,7 +40,7 @@ func (tms *IggyTcpClient) GetTopic(streamId iggcon.Identifier, topicId iggcon.Id
 		return nil, err
 	}
 	if len(buffer) == 0 {
-		return nil, ierror.New(ierror.TopicIdNotFound)
+		return nil, ierror.ErrTopicIdNotFound
 	}
 
 	topic, err := binaryserialization.DeserializeTopic(buffer)
@@ -62,16 +62,16 @@ func (tms *IggyTcpClient) CreateTopic(
 	topicId *uint32,
 ) (*iggcon.TopicDetails, error) {
 	if topicId != nil && *topicId == 0 {
-		return nil, ierror.New(ierror.InvalidTopicId)
+		return nil, ierror.ErrInvalidTopicId
 	}
 	if len(name) == 0 || len(name) > MaxStringLength {
-		return nil, ierror.New(ierror.InvalidTopicName)
+		return nil, ierror.ErrInvalidTopicName
 	}
 	if partitionsCount > MaxPartitionCount {
-		return nil, ierror.New(ierror.TooManyPartitions)
+		return nil, ierror.ErrTooManyPartitions
 	}
 	if replicationFactor != nil && *replicationFactor == 0 {
-		return nil, ierror.New(ierror.InvalidReplicationFactor)
+		return nil, ierror.ErrInvalidReplicationFactor
 	}
 
 	serializedRequest := binaryserialization.TcpCreateTopicRequest{
@@ -102,10 +102,10 @@ func (tms *IggyTcpClient) UpdateTopic(
 	replicationFactor *uint8,
 ) error {
 	if len(name) == 0 || len(name) > MaxStringLength {
-		return ierror.New(ierror.InvalidTopicName)
+		return ierror.ErrInvalidTopicName
 	}
 	if replicationFactor != nil && *replicationFactor == 0 {
-		return ierror.New(ierror.InvalidReplicationFactor)
+		return ierror.ErrInvalidReplicationFactor
 	}
 	serializedRequest := binaryserialization.TcpUpdateTopicRequest{
 		StreamId:             streamId,

@@ -30,8 +30,8 @@ func TestIggyError_Error(t *testing.T) {
 		err      error
 		expected string
 	}{
-		{name: "without message", err: New(InvalidCredentials), expected: "code=42: invalid_credentials"},
-		{name: "with message", err: New(InvalidCredentials, WithMsg("msg")), expected: "code=42: msg"},
+		{name: "with field", err: ErrInvalidTopicId, expected: "invalid topic id"},
+		{name: "without field", err: TopicIdNotFound{1, 1}, expected: "topic with id: 1 for stream with id: 1 was not found."},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -51,30 +51,30 @@ func TestIggyError_Is(t *testing.T) {
 	}{
 		{
 			name:     "different code",
-			err:      New(InvalidCredentials),
-			target:   New(InvalidStreamId),
+			err:      InvalidCredentials{},
+			target:   ErrInvalidStreamId,
 			expected: false,
 		}, {
-			name:     "same code, different message",
-			err:      New(InvalidCredentials, WithMsg("msg1")),
-			target:   New(InvalidCredentials, WithMsg("msg2")),
+			name:     "same type, different field",
+			err:      ResourceNotFound{"key1"},
+			target:   ResourceNotFound{"key2"},
 			expected: true,
 		},
 		{
-			name:     "wrapped error same code",
-			err:      fmt.Errorf("wrap: %w", New(InvalidCredentials)),
-			target:   New(InvalidCredentials),
+			name:     "wrapped error with same type",
+			err:      fmt.Errorf("wrap: %w", ErrInvalidCredentials),
+			target:   ErrInvalidCredentials,
 			expected: true,
 		},
 		{
 			name:     "compare with nil",
-			err:      New(InvalidCredentials),
+			err:      ErrInvalidCredentials,
 			target:   nil,
 			expected: false,
 		},
 		{
 			name:     "compare with different type",
-			err:      New(InvalidCredentials),
+			err:      ErrInvalidCredentials,
 			target:   io.EOF,
 			expected: false,
 		},
@@ -84,31 +84,6 @@ func TestIggyError_Is(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			if got := errors.Is(c.err, c.target); got != c.expected {
 				t.Errorf("errors.Is(%v, %v) = %v, want %v", c.err, c.target, got, c.expected)
-			}
-		})
-	}
-}
-
-func TestCode(t *testing.T) {
-	cases := []struct {
-		name     string
-		err      error
-		expected ErrCode
-	}{
-		{
-			name:     "error",
-			err:      New(InvalidCredentials),
-			expected: InvalidCredentials,
-		}, {
-			name:     "wrapped error",
-			err:      fmt.Errorf("wrapped error: %w", New(InvalidCredentials)),
-			expected: InvalidCredentials,
-		},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			if got := Code(c.err); got != c.expected {
-				t.Errorf("Code(%v) = %v, want %v", c.err, got, c.expected)
 			}
 		})
 	}

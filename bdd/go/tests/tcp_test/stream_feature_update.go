@@ -47,14 +47,14 @@ var _ = ginkgo.Describe("UPDATE STREAM:", func() {
 			stream2Identifier, _ := iggcon.NewIdentifier(stream2Id)
 			err := client.UpdateStream(stream2Identifier, stream1Name)
 
-			itShouldReturnErrorWithSpecificCode(err, ierror.StreamNameAlreadyExists)
+			itShouldReturnSpecificError(err, ierror.ErrStreamNameAlreadyExists)
 		})
 
 		ginkgo.Context("and tries to update non-existing stream", func() {
 			client := createAuthorizedConnection()
 			err := client.UpdateStream(randomU32Identifier(), createRandomString(128))
 
-			itShouldReturnErrorWithSpecificCode(err, ierror.StreamIdNotFound)
+			itShouldReturnSpecificError(err, ierror.ErrStreamIdNotFound)
 		})
 
 		ginkgo.Context("and tries to update existing stream with a name that's over 255 characters", func() {
@@ -64,7 +64,7 @@ var _ = ginkgo.Describe("UPDATE STREAM:", func() {
 			streamIdentifier, _ := iggcon.NewIdentifier(streamId)
 			err := client.UpdateStream(streamIdentifier, createRandomString(256))
 
-			itShouldReturnErrorWithSpecificCode(err, ierror.InvalidStreamName)
+			itShouldReturnSpecificError(err, ierror.ErrInvalidStreamName)
 		})
 	})
 

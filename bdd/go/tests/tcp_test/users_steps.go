@@ -117,7 +117,7 @@ func itShouldSuccessfullyDeleteUser(userId uint32, client iggycli.Client) {
 	identifier, _ := iggcon.NewIdentifier(userId)
 	user, err := client.GetUser(identifier)
 
-	itShouldReturnErrorWithSpecificCode(err, ierror.ResourceNotFound)
+	itShouldReturnSpecificError(err, ierror.ErrResourceNotFound)
 	ginkgo.It("should not return user", func() {
 		gomega.Expect(user).To(gomega.BeNil())
 	})

@@ -41,7 +41,7 @@ var _ = ginkgo.Describe("DELETE STREAM:", func() {
 
 			err := client.DeleteStream(randomU32Identifier())
 
-			itShouldReturnErrorWithSpecificCode(err, ierror.StreamIdNotFound)
+			itShouldReturnSpecificError(err, ierror.ErrStreamIdNotFound)
 		})
 	})
 
