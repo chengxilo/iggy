@@ -125,7 +125,7 @@ type IggyError interface {
 				_, _ = fmt.Fprintf(f, "    %s %s\n", field.Name, field.Type)
 			}
 			_, _ = fmt.Fprintln(f, "}")
-			// Error() method
+			// Error() function
 			args := make([]string, len(e.Fields))
 			for i, field := range e.Fields {
 				args[i] = "e." + field.Name
@@ -135,11 +135,11 @@ type IggyError interface {
 }
 `, e.Name, e.Format, strings.Join(args, ", "))
 		} else {
-			// no parameter error
 			_, err = fmt.Fprintf(f, "type %s struct{}\n", e.Name)
 			if err != nil {
 				panic(err)
 			}
+			// Error() function
 			_, err = fmt.Fprintf(f, "func (e %s) Error() string { return \"%s\" }\n", e.Name, e.Format)
 			if err != nil {
 				panic(err)
