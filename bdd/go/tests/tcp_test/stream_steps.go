@@ -20,7 +20,6 @@ package tcp_test
 import (
 	"fmt"
 
-	"github.com/apache/iggy/foreign/go/client"
 	iggcon "github.com/apache/iggy/foreign/go/contracts"
 	ierror "github.com/apache/iggy/foreign/go/errors"
 	"github.com/onsi/ginkgo/v2"
@@ -29,7 +28,7 @@ import (
 
 //operations
 
-func successfullyCreateStream(prefix string, client client.Client) (uint32, string) {
+func successfullyCreateStream(prefix string, client iggcon.Client) (uint32, string) {
 	name := createRandomStringWithPrefix(prefix, 128)
 
 	stream, err := client.CreateStream(name)
@@ -78,7 +77,7 @@ func itShouldContainSpecificStream(id uint32, name string, streams []iggcon.Stre
 	})
 }
 
-func itShouldSuccessfullyCreateStream(id uint32, expectedName string, client client.Client) {
+func itShouldSuccessfullyCreateStream(id uint32, expectedName string, client iggcon.Client) {
 	streamIdentifier, _ := iggcon.NewIdentifier(id)
 	stream, err := client.GetStream(streamIdentifier)
 
@@ -92,7 +91,7 @@ func itShouldSuccessfullyCreateStream(id uint32, expectedName string, client cli
 	})
 }
 
-func itShouldSuccessfullyUpdateStream(id uint32, expectedName string, client client.Client) {
+func itShouldSuccessfullyUpdateStream(id uint32, expectedName string, client iggcon.Client) {
 	streamIdentifier, _ := iggcon.NewIdentifier(id)
 	stream, err := client.GetStream(streamIdentifier)
 
@@ -106,7 +105,7 @@ func itShouldSuccessfullyUpdateStream(id uint32, expectedName string, client cli
 	})
 }
 
-func itShouldSuccessfullyDeleteStream(id uint32, client client.Client) {
+func itShouldSuccessfullyDeleteStream(id uint32, client iggcon.Client) {
 	streamIdentifier, _ := iggcon.NewIdentifier(id)
 	stream, err := client.GetStream(streamIdentifier)
 
@@ -116,7 +115,7 @@ func itShouldSuccessfullyDeleteStream(id uint32, client client.Client) {
 	})
 }
 
-func deleteStreamAfterTests(streamId uint32, client client.Client) {
+func deleteStreamAfterTests(streamId uint32, client iggcon.Client) {
 	streamIdentifier, _ := iggcon.NewIdentifier(streamId)
 	_ = client.DeleteStream(streamIdentifier)
 }

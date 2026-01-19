@@ -25,7 +25,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/apache/iggy/foreign/go/client"
 	iggcon "github.com/apache/iggy/foreign/go/contracts"
 	ierror "github.com/apache/iggy/foreign/go/errors"
 	"github.com/avast/retry-go"
@@ -52,7 +51,7 @@ type IggyTcpClient struct {
 	clientAddress          string
 	currentServerAddress   string
 	connectedAt            time.Time
-	state                  client.State
+	state                  iggcon.State
 }
 
 type config struct {
@@ -156,7 +155,7 @@ func NewIggyTcpClient(options ...Option) (*IggyTcpClient, error) {
 		config:                 opts.config,
 		clientAddress:          "",
 		conn:                   nil,
-		state:                  client.StateDisconnected,
+		state:                  iggcon.StateDisconnected,
 		connectedAt:            time.Time{},
 		leaderRedirectionState: iggcon.LeaderRedirectionState{},
 		currentServerAddress:   opts.config.serverAddress,
@@ -270,17 +269,17 @@ func (c *IggyTcpClient) GetConnectionInfo() *iggcon.ConnectionInfo {
 func (c *IggyTcpClient) connect() error {
 	c.mtx.Lock()
 	switch c.state {
-	case client.StateShutdown:
+	case iggcon.StateShutdown:
 		c.mtx.Unlock()
 		return ierror.ErrClientShutdown
-	case client.StateConnected,
-		client.StateAuthenticating,
-		client.StateAuthenticated,
-		client.StateConnecting:
+	case iggcon.StateConnected,
+		iggcon.StateAuthenticating,
+		iggcon.StateAuthenticated,
+		iggcon.StateConnecting:
 		c.mtx.Unlock()
 		return nil
 	default:
-		c.state = client.StateConnecting
+		c.state = iggcon.StateConnecting
 	}
 	connectedAt := c.connectedAt
 	c.mtx.Unlock()
@@ -308,7 +307,7 @@ func (c *IggyTcpClient) connect() error {
 				}
 
 				c.mtx.Lock()
-				c.state = client.StateDisconnected
+				c.state = iggcon.StateDisconnected
 				c.mtx.Unlock()
 				// TODO publish event disconnected
 				return ierror.ErrCannotEstablishConnection
@@ -337,7 +336,7 @@ func (c *IggyTcpClient) connect() error {
 
 	c.mtx.Lock()
 	c.conn = conn
-	c.state = client.StateConnected
+	c.state = iggcon.StateConnected
 	c.connectedAt = time.Now()
 	c.mtx.Unlock()
 	return nil
@@ -347,10 +346,10 @@ func (c *IggyTcpClient) disconnect() error {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
 
-	if c.state == client.StateDisconnected {
+	if c.state == iggcon.StateDisconnected {
 		return nil
 	}
-	c.state = client.StateDisconnected
+	c.state = iggcon.StateDisconnected
 	if err := c.conn.Close(); err != nil {
 		return err
 	}
@@ -361,13 +360,13 @@ func (c *IggyTcpClient) disconnect() error {
 func (c *IggyTcpClient) shutdown() error {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
-	if c.state == client.StateShutdown {
+	if c.state == iggcon.StateShutdown {
 		return nil
 	}
 	if err := c.conn.Close(); err != nil {
 		return err
 	}
-	c.state = client.StateShutdown
+	c.state = iggcon.StateShutdown
 	// TODO push shutdown event
 	return nil
 }
