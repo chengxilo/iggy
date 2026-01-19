@@ -19,13 +19,15 @@ package main
 
 import (
 	"flag"
-	"github.com/apache/iggy/examples/go/common"
-	iggcon "github.com/apache/iggy/foreign/go/contracts"
-	"github.com/apache/iggy/foreign/go/iggycli"
-	"github.com/apache/iggy/foreign/go/tcp"
 	"log"
 	"net"
 	"time"
+
+	"github.com/apache/iggy/examples/go/common"
+	"github.com/apache/iggy/foreign/go/client"
+	"github.com/apache/iggy/foreign/go/client/iggycli"
+	"github.com/apache/iggy/foreign/go/client/tcp"
+	iggcon "github.com/apache/iggy/foreign/go/contracts"
 )
 
 var (
@@ -56,7 +58,7 @@ func main() {
 	}
 }
 
-func consumeMessages(client iggycli.Client) error {
+func consumeMessages(client client.Client) error {
 	interval := 500 * time.Millisecond
 	log.Printf(
 		"Messages will be consumed from stream: %d, topic: %d, partition: %d with interval %s.",

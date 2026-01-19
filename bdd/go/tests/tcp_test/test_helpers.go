@@ -18,17 +18,19 @@
 package tcp_test
 
 import (
-	iggcon "github.com/apache/iggy/foreign/go/contracts"
 	"math/rand"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/apache/iggy/foreign/go/iggycli"
-	"github.com/apache/iggy/foreign/go/tcp"
+	"github.com/apache/iggy/foreign/go/client"
+	iggcon "github.com/apache/iggy/foreign/go/contracts"
+
+	"github.com/apache/iggy/foreign/go/client/iggycli"
+	"github.com/apache/iggy/foreign/go/client/tcp"
 )
 
-func createAuthorizedConnection() iggycli.Client {
+func createAuthorizedConnection() client.Client {
 	cli := createClient()
 	_, err := cli.LoginUser("iggy", "iggy")
 	if err != nil {
@@ -37,7 +39,7 @@ func createAuthorizedConnection() iggycli.Client {
 	return cli
 }
 
-func createClient() iggycli.Client {
+func createClient() client.Client {
 	addr := os.Getenv("IGGY_TCP_ADDRESS")
 	if addr == "" {
 		addr = "127.0.0.1:8090"

@@ -15,25 +15,13 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package tcp_test
+package iggcon
 
-import (
-	"github.com/apache/iggy/foreign/go/client"
-	iggcon "github.com/apache/iggy/foreign/go/contracts"
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
-)
+import "encoding"
 
-func itShouldHaveExpectedNumberOfPartitions(streamId uint32, topicId uint32, expectedPartitions uint32, client client.Client) {
-	streamIdentifier, _ := iggcon.NewIdentifier(streamId)
-	topicIdentifier, _ := iggcon.NewIdentifier(topicId)
-	topic, err := client.GetTopic(streamIdentifier, topicIdentifier)
+type Command interface {
+	// Code returns the command code associated with this command.
+	Code() CommandCode
 
-	ginkgo.It("should have "+string(rune(expectedPartitions))+" partitions", func() {
-		gomega.Expect(topic).NotTo(gomega.BeNil())
-		gomega.Expect(topic.PartitionsCount).To(gomega.Equal(expectedPartitions))
-		gomega.Expect(len(topic.Partitions)).To(gomega.Equal(int(expectedPartitions)))
-	})
-
-	itShouldNotReturnError(err)
+	encoding.BinaryMarshaler
 }

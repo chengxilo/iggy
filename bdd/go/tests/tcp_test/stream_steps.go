@@ -19,16 +19,17 @@ package tcp_test
 
 import (
 	"fmt"
+
+	"github.com/apache/iggy/foreign/go/client"
 	iggcon "github.com/apache/iggy/foreign/go/contracts"
 	ierror "github.com/apache/iggy/foreign/go/errors"
-	"github.com/apache/iggy/foreign/go/iggycli"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
 //operations
 
-func successfullyCreateStream(prefix string, client iggycli.Client) (uint32, string) {
+func successfullyCreateStream(prefix string, client client.Client) (uint32, string) {
 	name := createRandomStringWithPrefix(prefix, 128)
 
 	stream, err := client.CreateStream(name)
@@ -77,7 +78,7 @@ func itShouldContainSpecificStream(id uint32, name string, streams []iggcon.Stre
 	})
 }
 
-func itShouldSuccessfullyCreateStream(id uint32, expectedName string, client iggycli.Client) {
+func itShouldSuccessfullyCreateStream(id uint32, expectedName string, client client.Client) {
 	streamIdentifier, _ := iggcon.NewIdentifier(id)
 	stream, err := client.GetStream(streamIdentifier)
 
@@ -91,7 +92,7 @@ func itShouldSuccessfullyCreateStream(id uint32, expectedName string, client igg
 	})
 }
 
-func itShouldSuccessfullyUpdateStream(id uint32, expectedName string, client iggycli.Client) {
+func itShouldSuccessfullyUpdateStream(id uint32, expectedName string, client client.Client) {
 	streamIdentifier, _ := iggcon.NewIdentifier(id)
 	stream, err := client.GetStream(streamIdentifier)
 
@@ -105,7 +106,7 @@ func itShouldSuccessfullyUpdateStream(id uint32, expectedName string, client igg
 	})
 }
 
-func itShouldSuccessfullyDeleteStream(id uint32, client iggycli.Client) {
+func itShouldSuccessfullyDeleteStream(id uint32, client client.Client) {
 	streamIdentifier, _ := iggcon.NewIdentifier(id)
 	stream, err := client.GetStream(streamIdentifier)
 
@@ -115,7 +116,7 @@ func itShouldSuccessfullyDeleteStream(id uint32, client iggycli.Client) {
 	})
 }
 
-func deleteStreamAfterTests(streamId uint32, client iggycli.Client) {
+func deleteStreamAfterTests(streamId uint32, client client.Client) {
 	streamIdentifier, _ := iggcon.NewIdentifier(streamId)
 	_ = client.DeleteStream(streamIdentifier)
 }
