@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package client
+package util
 
 import (
 	"fmt"
@@ -29,7 +29,7 @@ import (
 
 // CheckAndRedirectToLeader queries the client for cluster metadata and returns
 // an address to redirect to (empty string means no redirection needed).
-func CheckAndRedirectToLeader(c Client, currentAddress string, transport iggcon.Protocol) (string, error) {
+func CheckAndRedirectToLeader(c iggcon.Client, currentAddress string, transport iggcon.Protocol) (string, error) {
 	log.Println("Checking cluster metadata for leader detection")
 
 	meta, err := c.GetClusterMetadata()

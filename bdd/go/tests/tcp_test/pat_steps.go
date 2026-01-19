@@ -18,7 +18,6 @@
 package tcp_test
 
 import (
-	"github.com/apache/iggy/foreign/go/client"
 	iggcon "github.com/apache/iggy/foreign/go/contracts"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -26,7 +25,7 @@ import (
 
 // OPERATIONS
 
-func successfullyCreateAccessToken(name string, client client.Client) string {
+func successfullyCreateAccessToken(name string, client iggcon.Client) string {
 	result, err := client.CreatePersonalAccessToken(name, 0)
 	itShouldNotReturnError(err)
 
@@ -35,14 +34,14 @@ func successfullyCreateAccessToken(name string, client client.Client) string {
 
 // ASSERTIONS
 
-func itShouldSuccessfullyCreateAccessToken(name string, client client.Client) {
+func itShouldSuccessfullyCreateAccessToken(name string, client iggcon.Client) {
 	tokens, err := client.GetPersonalAccessTokens()
 
 	itShouldNotReturnError(err)
 	itShouldContainSpecificAccessToken(name, tokens)
 }
 
-func itShouldSuccessfullyDeleteAccessToken(name string, client client.Client) {
+func itShouldSuccessfullyDeleteAccessToken(name string, client iggcon.Client) {
 	tokens, err := client.GetPersonalAccessTokens()
 
 	itShouldNotReturnError(err)

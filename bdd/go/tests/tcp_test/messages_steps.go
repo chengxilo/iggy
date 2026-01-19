@@ -21,7 +21,6 @@ import (
 	"bytes"
 	"reflect"
 
-	"github.com/apache/iggy/foreign/go/client"
 	iggcon "github.com/apache/iggy/foreign/go/contracts"
 	"github.com/google/uuid"
 	"github.com/onsi/ginkgo/v2"
@@ -42,7 +41,7 @@ func createDefaultMessages() []iggcon.IggyMessage {
 	return []iggcon.IggyMessage{msg1, msg2}
 }
 
-func itShouldSuccessfullyPublishMessages(streamId uint32, topicId uint32, messages []iggcon.IggyMessage, client client.Client) {
+func itShouldSuccessfullyPublishMessages(streamId uint32, topicId uint32, messages []iggcon.IggyMessage, client iggcon.Client) {
 	streamIdentifier, _ := iggcon.NewIdentifier(streamId)
 	topicIdentifier, _ := iggcon.NewIdentifier(topicId)
 	result, err := client.PollMessages(

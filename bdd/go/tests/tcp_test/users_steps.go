@@ -18,7 +18,6 @@
 package tcp_test
 
 import (
-	"github.com/apache/iggy/foreign/go/client"
 	iggcon "github.com/apache/iggy/foreign/go/contracts"
 	ierror "github.com/apache/iggy/foreign/go/errors"
 	"github.com/onsi/ginkgo/v2"
@@ -27,7 +26,7 @@ import (
 
 // OPERATIONS
 
-func successfullyCreateUser(name string, client client.Client) uint32 {
+func successfullyCreateUser(name string, client iggcon.Client) uint32 {
 	_, err := client.CreateUser(
 		name,
 		createRandomString(16),
@@ -56,7 +55,7 @@ func successfullyCreateUser(name string, client client.Client) uint32 {
 
 // ASSERTIONS
 
-func itShouldSuccessfullyCreateUser(name string, client client.Client) {
+func itShouldSuccessfullyCreateUser(name string, client iggcon.Client) {
 	nameIdentifier, _ := iggcon.NewIdentifier(name)
 	user, err := client.GetUser(nameIdentifier)
 
@@ -67,7 +66,7 @@ func itShouldSuccessfullyCreateUser(name string, client client.Client) {
 	})
 }
 
-func itShouldSuccessfullyCreateUserWithPermissions(name string, client client.Client, permissions map[int]*iggcon.StreamPermissions) {
+func itShouldSuccessfullyCreateUserWithPermissions(name string, client iggcon.Client, permissions map[int]*iggcon.StreamPermissions) {
 	nameIdentifier, _ := iggcon.NewIdentifier(name)
 	user, err := client.GetUser(nameIdentifier)
 
@@ -98,7 +97,7 @@ func itShouldSuccessfullyCreateUserWithPermissions(name string, client client.Cl
 	})
 }
 
-func itShouldSuccessfullyUpdateUser(id uint32, name string, client client.Client) {
+func itShouldSuccessfullyUpdateUser(id uint32, name string, client iggcon.Client) {
 	nameIdentifier, _ := iggcon.NewIdentifier(name)
 	user, err := client.GetUser(nameIdentifier)
 
@@ -113,7 +112,7 @@ func itShouldSuccessfullyUpdateUser(id uint32, name string, client client.Client
 	})
 }
 
-func itShouldSuccessfullyDeleteUser(userId uint32, client client.Client) {
+func itShouldSuccessfullyDeleteUser(userId uint32, client iggcon.Client) {
 	identifier, _ := iggcon.NewIdentifier(userId)
 	user, err := client.GetUser(identifier)
 
@@ -123,7 +122,7 @@ func itShouldSuccessfullyDeleteUser(userId uint32, client client.Client) {
 	})
 }
 
-func itShouldSuccessfullyUpdateUserPermissions(userId uint32, client client.Client) {
+func itShouldSuccessfullyUpdateUserPermissions(userId uint32, client iggcon.Client) {
 	identifier, _ := iggcon.NewIdentifier(userId)
 	user, err := client.GetUser(identifier)
 
@@ -173,6 +172,6 @@ func itShouldContainSpecificUser(name string, users []iggcon.UserInfo) {
 
 //CLEANUP
 
-func deleteUserAfterTests(identifier iggcon.Identifier, client client.Client) {
+func deleteUserAfterTests(identifier iggcon.Identifier, client iggcon.Client) {
 	_ = client.DeleteUser(identifier)
 }

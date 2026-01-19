@@ -15,34 +15,17 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package client
+package iggcon
 
-type State uint8
+type ClientInfoDetails struct {
+	ClientInfo
+	ConsumerGroups []ConsumerGroupInfo `json:"consumerGroups,omitempty"`
+}
 
-const (
-	StateShutdown State = iota
-	StateDisconnected
-	StateConnecting
-	StateConnected
-	StateAuthenticating
-	StateAuthenticated
-)
-
-func (s State) String() string {
-	switch s {
-	case StateShutdown:
-		return "shutdown"
-	case StateDisconnected:
-		return "disconnected"
-	case StateConnecting:
-		return "connecting"
-	case StateConnected:
-		return "connected"
-	case StateAuthenticating:
-		return "authenticating"
-	case StateAuthenticated:
-		return "authenticated"
-	default:
-		return "unknown"
-	}
+type ClientInfo struct {
+	ID                  uint32 `json:"id"`
+	Address             string `json:"address"`
+	UserID              uint32 `json:"userId"`
+	Transport           string `json:"transport"`
+	ConsumerGroupsCount uint32 `json:"consumerGroupsCount"`
 }

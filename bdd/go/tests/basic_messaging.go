@@ -24,7 +24,6 @@ import (
 	"os"
 
 	"github.com/apache/iggy/foreign/go/client"
-	"github.com/apache/iggy/foreign/go/client/iggycli"
 	"github.com/apache/iggy/foreign/go/client/tcp"
 	iggcon "github.com/apache/iggy/foreign/go/contracts"
 	"github.com/cucumber/godog"
@@ -35,7 +34,7 @@ type basicMessagingCtxKey struct{}
 
 type basicMessagingCtx struct {
 	serverAddr          *string
-	client              client.Client
+	client              iggcon.Client
 	lastSentMessage     *iggcon.IggyMessage
 	lastPollMessages    *iggcon.PolledMessage
 	lastStreamID        *uint32
@@ -65,8 +64,8 @@ func (s basicMessagingSteps) givenAuthenticationAsRoot(ctx context.Context) erro
 	c := getBasicMessagingCtx(ctx)
 	serverAddr := *c.serverAddr
 
-	cli, err := iggycli.NewIggyClient(
-		iggycli.WithTcp(
+	cli, err := client.NewIggyClient(
+		client.WithTcp(
 			tcp.WithServerAddress(serverAddr),
 		),
 	)

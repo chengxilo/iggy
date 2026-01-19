@@ -21,7 +21,7 @@ import (
 	"time"
 
 	binaryserialization "github.com/apache/iggy/foreign/go/binary_serialization"
-	"github.com/apache/iggy/foreign/go/client"
+	"github.com/apache/iggy/foreign/go/internal/util"
 
 	iggcon "github.com/apache/iggy/foreign/go/contracts"
 )
@@ -56,7 +56,7 @@ func (c *IggyTcpClient) HandleLeaderRedirection() (bool, error) {
 	currentAddress := c.currentServerAddress
 	c.mtx.Unlock()
 
-	leaderAddress, err := client.CheckAndRedirectToLeader(
+	leaderAddress, err := util.CheckAndRedirectToLeader(
 		c,
 		currentAddress,
 		iggcon.Tcp,
