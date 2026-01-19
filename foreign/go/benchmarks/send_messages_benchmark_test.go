@@ -24,9 +24,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/apache/iggy/foreign/go/client"
+	"github.com/apache/iggy/foreign/go/client/iggycli"
+	"github.com/apache/iggy/foreign/go/client/tcp"
 	iggcon "github.com/apache/iggy/foreign/go/contracts"
-	"github.com/apache/iggy/foreign/go/iggycli"
-	"github.com/apache/iggy/foreign/go/tcp"
 	"github.com/google/uuid"
 )
 
@@ -41,7 +42,7 @@ const (
 
 func BenchmarkSendMessage(b *testing.B) {
 	rand.New(rand.NewSource(42)) // Seed the random number generator for consistent results
-	clients := make([]iggycli.Client, producerCount)
+	clients := make([]client.Client, producerCount)
 
 	for i := 0; i < producerCount; i++ {
 		cli, err := iggycli.NewIggyClient(
@@ -103,7 +104,7 @@ func BenchmarkSendMessage(b *testing.B) {
 	}
 }
 
-func ensureInfrastructureIsInitialized(cli iggycli.Client, streamId uint32) error {
+func ensureInfrastructureIsInitialized(cli client.Client, streamId uint32) error {
 	streamIdentifier, _ := iggcon.NewIdentifier(streamId)
 	if _, streamErr := cli.GetStream(streamIdentifier); streamErr != nil {
 		_, streamErr = cli.CreateStream("benchmark" + fmt.Sprint(streamId))
@@ -131,7 +132,7 @@ func ensureInfrastructureIsInitialized(cli iggycli.Client, streamId uint32) erro
 	return nil
 }
 
-func cleanupInfrastructure(cli iggycli.Client, streamId uint32) error {
+func cleanupInfrastructure(cli client.Client, streamId uint32) error {
 	streamIdent, _ := iggcon.NewIdentifier(streamId)
 	return cli.DeleteStream(streamIdent)
 }
@@ -156,7 +157,7 @@ func CreateMessages(messagesCount, messageSize int) []iggcon.IggyMessage {
 }
 
 // SendMessage performs the message sending operation.
-func SendMessage(cli iggycli.Client, producerNumber, messagesCount, messagesBatch, messageSize int) (avgLatency float64, avgThroughput float64) {
+func SendMessage(cli client.Client, producerNumber, messagesCount, messagesBatch, messageSize int) (avgLatency float64, avgThroughput float64) {
 	totalMessages := messagesBatch * messagesCount
 	totalMessagesBytes := int64(totalMessages * messageSize)
 	fmt.Printf("Executing Send Messages command for producer %d, messages count %d, with size %d bytes\n", producerNumber, totalMessages, totalMessagesBytes)

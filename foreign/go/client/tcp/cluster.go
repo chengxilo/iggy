@@ -15,23 +15,19 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package iggcon
+package tcp
 
-type IggyMessageCompression string
+import iggcon "github.com/apache/iggy/foreign/go/contracts"
 
-const (
-	MESSAGE_COMPRESSION_NONE      IggyMessageCompression = "none"
-	MESSAGE_COMPRESSION_S2        IggyMessageCompression = "s2"
-	MESSAGE_COMPRESSION_S2_BETTER IggyMessageCompression = "s2-better"
-	MESSAGE_COMPRESSION_S2_BEST   IggyMessageCompression = "s2-best"
-	// MESSAGE_COMPRESSION_ZSTD IggyMessageCompression = "zstd"
-)
-
-type Protocol string
-
-const (
-	Http      Protocol = "http"
-	Tcp       Protocol = "tcp"
-	Quic      Protocol = "quic"
-	WebSocket Protocol = "ws"
-)
+func (c *IggyTcpClient) GetClusterMetadata() (*iggcon.ClusterMetadata, error) {
+	response, err := c.do(&iggcon.GetClusterMetadata{})
+	if err != nil {
+		return nil, err
+	}
+	var metadata iggcon.ClusterMetadata
+	err = metadata.UnmarshalBinary(response)
+	if err != nil {
+		return nil, err
+	}
+	return &metadata, nil
+}

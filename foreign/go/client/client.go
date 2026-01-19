@@ -15,13 +15,23 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package iggycli
+package client
 
 import (
 	iggcon "github.com/apache/iggy/foreign/go/contracts"
 )
 
 type Client interface {
+	// Close closes the client and releases all the resources.
+	Close() error
+
+	// GetConnectionInfo returns the current connection information including protocol and server address
+	GetConnectionInfo() *iggcon.ConnectionInfo
+
+	// GetClusterMetadata get the metadata of the cluster including node information, roles, and status.
+	// Authentication is required.
+	GetClusterMetadata() (*iggcon.ClusterMetadata, error)
+
 	// GetStream get the info about a specific stream by unique ID or name.
 	// Authentication is required, and the permission to read the streams.
 	GetStream(streamId iggcon.Identifier) (*iggcon.StreamDetails, error)

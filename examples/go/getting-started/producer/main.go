@@ -20,14 +20,16 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/apache/iggy/examples/go/common"
-	iggcon "github.com/apache/iggy/foreign/go/contracts"
 	"log"
 	"net"
 	"time"
 
-	"github.com/apache/iggy/foreign/go/iggycli"
-	"github.com/apache/iggy/foreign/go/tcp"
+	"github.com/apache/iggy/examples/go/common"
+	"github.com/apache/iggy/foreign/go/client"
+	iggcon "github.com/apache/iggy/foreign/go/contracts"
+
+	"github.com/apache/iggy/foreign/go/client/iggycli"
+	"github.com/apache/iggy/foreign/go/client/tcp"
 )
 
 var (
@@ -56,7 +58,7 @@ func main() {
 	}
 }
 
-func initSystem(client iggycli.Client) {
+func initSystem(client client.Client) {
 	if _, err := client.CreateStream("sample-stream"); err != nil {
 		log.Printf("WARN: Stream already exists or error: %v", err)
 	}
@@ -76,7 +78,7 @@ func initSystem(client iggycli.Client) {
 	log.Println("Topic was created.")
 }
 
-func produceMessages(client iggycli.Client) error {
+func produceMessages(client client.Client) error {
 	interval := 500 * time.Millisecond
 	log.Printf(
 		"Messages will be sent to stream: %d, topic: %d, partition: %d with interval %s.",
