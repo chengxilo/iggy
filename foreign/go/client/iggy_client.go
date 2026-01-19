@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package iggycli
+package client
 
 import (
 	"context"
@@ -23,7 +23,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/apache/iggy/foreign/go/client"
 	"github.com/apache/iggy/foreign/go/client/tcp"
 	iggcon "github.com/apache/iggy/foreign/go/contracts"
 )
@@ -54,13 +53,13 @@ func WithTcp(tcpOpts ...tcp.Option) Option {
 }
 
 type IggyClient struct {
-	client.Client
+	iggcon.Client
 	cancel context.CancelFunc
 }
 
 // NewIggyClient create the IggyClient instance.
 // If no Option is provided, NewIggyClient will create a default TCP client.
-func NewIggyClient(options ...Option) (client.Client, error) {
+func NewIggyClient(options ...Option) (iggcon.Client, error) {
 	opts := GetDefaultOptions()
 
 	for _, opt := range options {
@@ -68,7 +67,7 @@ func NewIggyClient(options ...Option) (client.Client, error) {
 	}
 
 	var err error
-	var cli client.Client
+	var cli iggcon.Client
 	switch opts.protocol {
 	case iggcon.Tcp:
 		cli, err = tcp.NewIggyTcpClient(opts.tcpOptions...)

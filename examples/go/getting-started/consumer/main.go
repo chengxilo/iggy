@@ -25,7 +25,6 @@ import (
 
 	"github.com/apache/iggy/examples/go/common"
 	"github.com/apache/iggy/foreign/go/client"
-	"github.com/apache/iggy/foreign/go/client/iggycli"
 	"github.com/apache/iggy/foreign/go/client/tcp"
 	iggcon "github.com/apache/iggy/foreign/go/contracts"
 )
@@ -38,8 +37,8 @@ var (
 )
 
 func main() {
-	client, err := iggycli.NewIggyClient(
-		iggycli.WithTcp(
+	client, err := client.NewIggyClient(
+		client.WithTcp(
 			tcp.WithServerAddress(getTcpServerAddr()),
 		),
 	)
@@ -58,7 +57,7 @@ func main() {
 	}
 }
 
-func consumeMessages(client client.Client) error {
+func consumeMessages(client iggcon.Client) error {
 	interval := 500 * time.Millisecond
 	log.Printf(
 		"Messages will be consumed from stream: %d, topic: %d, partition: %d with interval %s.",

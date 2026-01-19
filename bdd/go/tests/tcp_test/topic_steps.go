@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/apache/iggy/foreign/go/client"
 	iggcon "github.com/apache/iggy/foreign/go/contracts"
 	ierror "github.com/apache/iggy/foreign/go/errors"
 	"github.com/onsi/ginkgo/v2"
@@ -30,7 +29,7 @@ import (
 
 //operations
 
-func successfullyCreateTopic(streamId uint32, client client.Client) (uint32, string) {
+func successfullyCreateTopic(streamId uint32, client iggcon.Client) (uint32, string) {
 	replicationFactor := uint8(1)
 	name := createRandomString(128)
 	streamIdentifier, _ := iggcon.NewIdentifier(streamId)
@@ -87,7 +86,7 @@ func itShouldContainSpecificTopic(id uint32, name string, topics []iggcon.Topic)
 	})
 }
 
-func itShouldSuccessfullyCreateTopic(streamId uint32, topicId uint32, expectedName string, client client.Client) {
+func itShouldSuccessfullyCreateTopic(streamId uint32, topicId uint32, expectedName string, client iggcon.Client) {
 	streamIdentifier, _ := iggcon.NewIdentifier(streamId)
 	topicIdentifier, _ := iggcon.NewIdentifier(topicId)
 	topic, err := client.GetTopic(streamIdentifier, topicIdentifier)
@@ -103,7 +102,7 @@ func itShouldSuccessfullyCreateTopic(streamId uint32, topicId uint32, expectedNa
 	itShouldNotReturnError(err)
 }
 
-func itShouldSuccessfullyUpdateTopic(streamId uint32, topicId uint32, expectedName string, client client.Client) {
+func itShouldSuccessfullyUpdateTopic(streamId uint32, topicId uint32, expectedName string, client iggcon.Client) {
 	streamIdentifier, _ := iggcon.NewIdentifier(streamId)
 	topicIdentifier, _ := iggcon.NewIdentifier(topicId)
 	topic, err := client.GetTopic(streamIdentifier, topicIdentifier)
@@ -120,7 +119,7 @@ func itShouldSuccessfullyUpdateTopic(streamId uint32, topicId uint32, expectedNa
 	itShouldNotReturnError(err)
 }
 
-func itShouldSuccessfullyDeleteTopic(streamId uint32, topicId uint32, client client.Client) {
+func itShouldSuccessfullyDeleteTopic(streamId uint32, topicId uint32, client iggcon.Client) {
 	streamIdentifier, _ := iggcon.NewIdentifier(streamId)
 	topicIdentifier, _ := iggcon.NewIdentifier(topicId)
 	topic, err := client.GetTopic(streamIdentifier, topicIdentifier)

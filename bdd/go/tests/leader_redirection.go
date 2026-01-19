@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"github.com/apache/iggy/foreign/go/client"
-	"github.com/apache/iggy/foreign/go/client/iggycli"
 	"github.com/apache/iggy/foreign/go/client/tcp"
 	iggcon "github.com/apache/iggy/foreign/go/contracts"
 	ierror "github.com/apache/iggy/foreign/go/errors"
@@ -40,7 +39,7 @@ const defaultRootPassword = "iggy"
 
 type leaderCtxKey struct{}
 type leaderCtx struct {
-	Clients   map[string]client.Client
+	Clients   map[string]iggcon.Client
 	Servers   ServerConfigs
 	Cluster   ClusterState
 	TestState TestState
@@ -70,9 +69,9 @@ func getLeaderContext(ctx context.Context) *leaderCtx {
 	return ctx.Value(leaderCtxKey{}).(*leaderCtx)
 }
 
-func createAndConnectClient(addr string) (client.Client, error) {
-	cli, err := iggycli.NewIggyClient(
-		iggycli.WithTcp(
+func createAndConnectClient(addr string) (iggcon.Client, error) {
+	cli, err := client.NewIggyClient(
+		client.WithTcp(
 			tcp.WithServerAddress(addr),
 		),
 	)
@@ -122,7 +121,7 @@ func serverTypeFromPort(port uint16) string {
 	}
 }
 
-func verifyLeaderInMetadata(client client.Client) (*iggcon.ClusterNode, error) {
+func verifyLeaderInMetadata(client iggcon.Client) (*iggcon.ClusterNode, error) {
 	metadata, err := client.GetClusterMetadata()
 	if err != nil {
 		if isClusteringUnavailable(err) {
@@ -143,7 +142,7 @@ func verifyLeaderInMetadata(client client.Client) (*iggcon.ClusterNode, error) {
 	return nil, nil
 }
 
-func verifyClientConnection(client client.Client, expectedPort uint16) (string, error) {
+func verifyClientConnection(client iggcon.Client, expectedPort uint16) (string, error) {
 	connInfo := client.GetConnectionInfo()
 
 	expectedSuffix := fmt.Sprintf(":%d", expectedPort)
@@ -486,7 +485,7 @@ func (s leaderSteps) thenBothUseSameServer(ctx context.Context) error {
 func initLeaderRedirectionScenario(sc *godog.ScenarioContext) {
 	sc.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
 		return context.WithValue(context.Background(), leaderCtxKey{}, &leaderCtx{
-			Clients: make(map[string]client.Client),
+			Clients: make(map[string]iggcon.Client),
 			Servers: ServerConfigs{
 				Addresses: make(map[string]string),
 			},
