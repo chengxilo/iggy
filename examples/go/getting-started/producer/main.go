@@ -20,21 +20,23 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/apache/iggy/examples/go/common"
-	iggcon "github.com/apache/iggy/foreign/go/contracts"
 	"log"
 	"net"
 	"time"
 
-	"github.com/apache/iggy/foreign/go/iggycli"
-	"github.com/apache/iggy/foreign/go/tcp"
+	"github.com/apache/iggy/examples/go/common"
+	"github.com/apache/iggy/foreign/go/client"
+	iggcon "github.com/apache/iggy/foreign/go/contracts"
+
+	"github.com/apache/iggy/foreign/go/client/iggycli"
+	"github.com/apache/iggy/foreign/go/client/tcp"
 )
 
 var (
-    StreamId     = uint32(0)
-    TopicId      = uint32(0)
-    PartitionId  = uint32(0)
-    BatchesLimit = uint32(5)
+	StreamId     = uint32(0)
+	TopicId      = uint32(0)
+	PartitionId  = uint32(0)
+	BatchesLimit = uint32(5)
 )
 
 func main() {
@@ -56,27 +58,27 @@ func main() {
 	}
 }
 
-func initSystem(client iggycli.Client) {
-    if _, err := client.CreateStream("sample-stream"); err != nil {
+func initSystem(client client.Client) {
+	if _, err := client.CreateStream("sample-stream"); err != nil {
 		log.Printf("WARN: Stream already exists or error: %v", err)
 	}
 	log.Println("Stream was created.")
 
 	streamIdentifier, _ := iggcon.NewIdentifier(StreamId)
-    if _, err := client.CreateTopic(
+	if _, err := client.CreateTopic(
 		streamIdentifier,
 		"sample-topic",
 		1,
 		iggcon.CompressionAlgorithmNone,
 		iggcon.IggyExpiryNeverExpire,
 		0,
-        nil); err != nil {
+		nil); err != nil {
 		log.Printf("WARN: Topic already exists and will not be created again or error: %v", err)
 	}
 	log.Println("Topic was created.")
 }
 
-func produceMessages(client iggycli.Client) error {
+func produceMessages(client client.Client) error {
 	interval := 500 * time.Millisecond
 	log.Printf(
 		"Messages will be sent to stream: %d, topic: %d, partition: %d with interval %s.",

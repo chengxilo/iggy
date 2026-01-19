@@ -15,13 +15,23 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package iggycli
+package client
 
 import (
 	iggcon "github.com/apache/iggy/foreign/go/contracts"
 )
 
 type Client interface {
+	// Close closes the client and releases all the resources.
+	Close() error
+
+	// GetConnectionInfo returns the current connection information including protocol and server address
+	GetConnectionInfo() *iggcon.ConnectionInfo
+
+	// GetClusterMetadata get the metadata of the cluster including node information, roles, and status.
+	// Authentication is required.
+	GetClusterMetadata() (*iggcon.ClusterMetadata, error)
+
 	// GetStream get the info about a specific stream by unique ID or name.
 	// Authentication is required, and the permission to read the streams.
 	GetStream(streamId iggcon.Identifier) (*iggcon.StreamDetails, error)
@@ -30,9 +40,9 @@ type Client interface {
 	// Authentication is required, and the permission to read the streams.
 	GetStreams() ([]iggcon.Stream, error)
 
-    // CreateStream create a new stream.
-    // Authentication is required, and the permission to manage the streams.
-    CreateStream(name string) (*iggcon.StreamDetails, error)
+	// CreateStream create a new stream.
+	// Authentication is required, and the permission to manage the streams.
+	CreateStream(name string) (*iggcon.StreamDetails, error)
 
 	// UpdateStream update a stream by unique ID or name.
 	// Authentication is required, and the permission to manage the streams.
@@ -52,15 +62,15 @@ type Client interface {
 
 	// CreateTopic create a new topic.
 	// Authentication is required, and the permission to manage the topics.
-    CreateTopic(
-        streamId iggcon.Identifier,
-        name string,
-        partitionsCount uint32,
-        compressionAlgorithm iggcon.CompressionAlgorithm,
-        messageExpiry iggcon.Duration,
-        maxTopicSize uint64,
-        replicationFactor *uint8,
-    ) (*iggcon.TopicDetails, error)
+	CreateTopic(
+		streamId iggcon.Identifier,
+		name string,
+		partitionsCount uint32,
+		compressionAlgorithm iggcon.CompressionAlgorithm,
+		messageExpiry iggcon.Duration,
+		maxTopicSize uint64,
+		replicationFactor *uint8,
+	) (*iggcon.TopicDetails, error)
 
 	// UpdateTopic update a topic by unique ID or name.
 	// Authentication is required, and the permission to manage the topics.
@@ -141,11 +151,11 @@ type Client interface {
 
 	// CreateConsumerGroup create a new consumer group for the given stream and topic by unique IDs or names.
 	// Authentication is required, and the permission to manage the streams or topics.
-    CreateConsumerGroup(
-        streamId iggcon.Identifier,
-        topicId iggcon.Identifier,
-        name string,
-    ) (*iggcon.ConsumerGroupDetails, error)
+	CreateConsumerGroup(
+		streamId iggcon.Identifier,
+		topicId iggcon.Identifier,
+		name string,
+	) (*iggcon.ConsumerGroupDetails, error)
 
 	// DeleteConsumerGroup delete a consumer group by unique ID or name for the given stream and topic by unique IDs or names.
 	// Authentication is required, and the permission to manage the streams or topics.

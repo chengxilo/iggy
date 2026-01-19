@@ -18,21 +18,28 @@
 package iggycli
 
 import (
+	"context"
 	"fmt"
+	"log"
+	"time"
 
+	"github.com/apache/iggy/foreign/go/client"
+	"github.com/apache/iggy/foreign/go/client/tcp"
 	iggcon "github.com/apache/iggy/foreign/go/contracts"
-	"github.com/apache/iggy/foreign/go/tcp"
 )
 
 type Options struct {
 	protocol   iggcon.Protocol
 	tcpOptions []tcp.Option
+
+	heartbeatInterval time.Duration
 }
 
 func GetDefaultOptions() Options {
 	return Options{
-		protocol:   iggcon.Tcp,
-		tcpOptions: nil,
+		protocol:          iggcon.Tcp,
+		tcpOptions:        nil,
+		heartbeatInterval: 5 * time.Second,
 	}
 }
 
@@ -46,9 +53,14 @@ func WithTcp(tcpOpts ...tcp.Option) Option {
 	}
 }
 
+type IggyClient struct {
+	client.Client
+	cancel context.CancelFunc
+}
+
 // NewIggyClient create the IggyClient instance.
 // If no Option is provided, NewIggyClient will create a default TCP client.
-func NewIggyClient(options ...Option) (Client, error) {
+func NewIggyClient(options ...Option) (client.Client, error) {
 	opts := GetDefaultOptions()
 
 	for _, opt := range options {
@@ -56,7 +68,7 @@ func NewIggyClient(options ...Option) (Client, error) {
 	}
 
 	var err error
-	var cli Client
+	var cli client.Client
 	switch opts.protocol {
 	case iggcon.Tcp:
 		cli, err = tcp.NewIggyTcpClient(opts.tcpOptions...)
@@ -66,6 +78,31 @@ func NewIggyClient(options ...Option) (Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create an iggy client: %w", err)
 	}
+	ctx, cancel := context.WithCancel(context.Background())
+	heartbeatInterval := opts.heartbeatInterval
+	if heartbeatInterval > 0 {
+		go func() {
+			ticker := time.NewTicker(heartbeatInterval)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					if err := cli.Ping(); err != nil {
+						log.Printf("[WARN] heartbeat failed: %v", err)
+					}
+				}
+			}
+		}()
+	}
+	return &IggyClient{
+		Client: cli,
+		cancel: cancel,
+	}, nil
+}
 
-	return cli, nil
+func (ic *IggyClient) Close() error {
+	ic.cancel()
+	return ic.Client.Close()
 }
