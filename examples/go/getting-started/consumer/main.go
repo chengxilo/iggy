@@ -37,7 +37,7 @@ var (
 )
 
 func main() {
-	client, err := client.NewIggyClient(
+	cli, err := client.NewIggyClient(
 		client.WithTcp(
 			tcp.WithServerAddress(getTcpServerAddr()),
 		),
@@ -45,13 +45,18 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer func() {
+		if err := cli.Close(); err != nil {
+			log.Printf("Error closing client: %v", err)
+		}
+	}()
 
-	_, err = client.LoginUser(common.DefaultRootUsername, common.DefaultRootPassword)
+	_, err = cli.LoginUser(common.DefaultRootUsername, common.DefaultRootPassword)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = consumeMessages(client)
+	err = consumeMessages(cli)
 	if err != nil {
 		log.Fatal(err)
 	}
