@@ -65,35 +65,34 @@ func (c *IggyTcpClient) HandleLeaderRedirection() (bool, error) {
 		return false, err
 	}
 
-	if leaderAddress != "" {
+	if leaderAddress == "" {
+		// No leader redirection
 		c.mtx.Lock()
-		if !c.leaderRedirectionState.CanRedirect() {
-			c.mtx.Unlock()
-			return false, nil
-		}
-
-		c.leaderRedirectionState.IncrementRedirect(leaderAddress)
-		// Clear connectedAt to avoid reestablish delay during redirection
-		c.connectedAt = time.Time{}
+		c.leaderRedirectionState.Reset()
 		c.mtx.Unlock()
 
-		if err = c.disconnect(); err != nil {
-			return false, err
-		}
-
-		c.mtx.Lock()
-		c.currentServerAddress = leaderAddress
-		c.mtx.Unlock()
-
-		return true, nil
+		return false, nil
 	}
 
-	// No leader redirection
 	c.mtx.Lock()
-	c.leaderRedirectionState.Reset()
+	if !c.leaderRedirectionState.CanRedirect() {
+		c.mtx.Unlock()
+		return false, nil
+	}
 	c.mtx.Unlock()
 
-	return false, nil
+	if err = c.disconnect(); err != nil {
+		return false, err
+	}
+
+	c.mtx.Lock()
+	c.leaderRedirectionState.IncrementRedirect(leaderAddress)
+	// Clear connectedAt to avoid reestablish delay during redirection
+	c.connectedAt = time.Time{}
+	c.currentServerAddress = leaderAddress
+	c.mtx.Unlock()
+
+	return true, nil
 }
 
 func (c *IggyTcpClient) LoginWithPersonalAccessToken(token string) (*iggcon.IdentityInfo, error) {
