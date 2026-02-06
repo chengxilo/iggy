@@ -36,7 +36,7 @@ func (c *IggyTcpClient) LoginUser(username string, password string) (*iggcon.Ide
 		return nil, err
 	}
 
-	identify := binaryserialization.DeserializeLogInResponse(buffer)
+	identity := binaryserialization.DeserializeLogInResponse(buffer)
 	shouldRedirect, err := c.HandleLeaderRedirection()
 	if err != nil {
 		return nil, err
@@ -47,7 +47,7 @@ func (c *IggyTcpClient) LoginUser(username string, password string) (*iggcon.Ide
 		}
 		return c.LoginUser(username, password)
 	}
-	return identify, nil
+	return identity, nil
 }
 
 func (c *IggyTcpClient) LoginWithPersonalAccessToken(token string) (*iggcon.IdentityInfo, error) {
@@ -59,7 +59,7 @@ func (c *IggyTcpClient) LoginWithPersonalAccessToken(token string) (*iggcon.Iden
 		return nil, err
 	}
 
-	identify := binaryserialization.DeserializeLogInResponse(buffer)
+	identity := binaryserialization.DeserializeLogInResponse(buffer)
 	shouldRedirect, err := c.HandleLeaderRedirection()
 	if err != nil {
 		return nil, err
@@ -70,7 +70,7 @@ func (c *IggyTcpClient) LoginWithPersonalAccessToken(token string) (*iggcon.Iden
 		}
 		return c.LoginWithPersonalAccessToken(token)
 	}
-	return identify, nil
+	return identity, nil
 }
 
 func (c *IggyTcpClient) LogoutUser() error {
