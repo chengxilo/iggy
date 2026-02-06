@@ -24,6 +24,8 @@ import (
 	"io"
 )
 
+const MaxNodesPerCluster = 64
+
 type ClusterMetadata struct {
 	Name  string
 	Nodes []ClusterNode
@@ -86,6 +88,10 @@ func (m *ClusterMetadata) UnmarshalBinary(data []byte) error {
 	var nodesCount uint32
 	if err := binary.Read(r, binary.LittleEndian, &nodesCount); err != nil {
 		return err
+	}
+
+	if nodesCount > MaxNodesPerCluster {
+		return errors.New("invalid number of nodes per cluster")
 	}
 
 	m.Nodes = make([]ClusterNode, 0, nodesCount)
