@@ -50,6 +50,34 @@ func (c *IggyTcpClient) LoginUser(username string, password string) (*iggcon.Ide
 	return identify, nil
 }
 
+func (c *IggyTcpClient) LoginWithPersonalAccessToken(token string) (*iggcon.IdentityInfo, error) {
+	message := binaryserialization.SerializeLoginWithPersonalAccessToken(iggcon.LoginWithPersonalAccessTokenRequest{
+		Token: token,
+	})
+	buffer, err := c.sendAndFetchResponse(message, iggcon.LoginWithAccessTokenCode)
+	if err != nil {
+		return nil, err
+	}
+
+	identify := binaryserialization.DeserializeLogInResponse(buffer)
+	shouldRedirect, err := c.HandleLeaderRedirection()
+	if err != nil {
+		return nil, err
+	}
+	if shouldRedirect {
+		if err = c.connect(); err != nil {
+			return nil, err
+		}
+		return c.LoginWithPersonalAccessToken(token)
+	}
+	return identify, nil
+}
+
+func (c *IggyTcpClient) LogoutUser() error {
+	_, err := c.sendAndFetchResponse([]byte{}, iggcon.LogoutUserCode)
+	return err
+}
+
 func (c *IggyTcpClient) HandleLeaderRedirection() (bool, error) {
 	// Clone current address
 	c.mtx.Lock()
@@ -93,32 +121,4 @@ func (c *IggyTcpClient) HandleLeaderRedirection() (bool, error) {
 	c.mtx.Unlock()
 
 	return true, nil
-}
-
-func (c *IggyTcpClient) LoginWithPersonalAccessToken(token string) (*iggcon.IdentityInfo, error) {
-	message := binaryserialization.SerializeLoginWithPersonalAccessToken(iggcon.LoginWithPersonalAccessTokenRequest{
-		Token: token,
-	})
-	buffer, err := c.sendAndFetchResponse(message, iggcon.LoginWithAccessTokenCode)
-	if err != nil {
-		return nil, err
-	}
-
-	identify := binaryserialization.DeserializeLogInResponse(buffer)
-	shouldRedirect, err := c.HandleLeaderRedirection()
-	if err != nil {
-		return nil, err
-	}
-	if shouldRedirect {
-		if err = c.connect(); err != nil {
-			return nil, err
-		}
-		return c.LoginWithPersonalAccessToken(token)
-	}
-	return identify, nil
-}
-
-func (c *IggyTcpClient) LogoutUser() error {
-	_, err := c.sendAndFetchResponse([]byte{}, iggcon.LogoutUserCode)
-	return err
 }
