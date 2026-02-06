@@ -104,7 +104,18 @@ func (c *IggyTcpClient) LoginWithPersonalAccessToken(token string) (*iggcon.Iden
 		return nil, err
 	}
 
-	return binaryserialization.DeserializeLogInResponse(buffer), nil
+	identify := binaryserialization.DeserializeLogInResponse(buffer)
+	shouldRedirect, err := c.HandleLeaderRedirection()
+	if err != nil {
+		return nil, err
+	}
+	if shouldRedirect {
+		if err = c.connect(); err != nil {
+			return nil, err
+		}
+		return c.LoginWithPersonalAccessToken(token)
+	}
+	return identify, nil
 }
 
 func (c *IggyTcpClient) LogoutUser() error {
