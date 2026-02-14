@@ -385,20 +385,3 @@ func SerializeLoginWithPersonalAccessToken(request iggcon.LoginWithPersonalAcces
 	copy(bytes[1:], []byte(request.Token))
 	return bytes
 }
-
-func SerializeDeletePersonalAccessToken(request iggcon.DeletePersonalAccessTokenRequest) []byte {
-	length := 1 + len(request.Name)
-	bytes := make([]byte, length)
-	bytes[0] = byte(len(request.Name))
-	copy(bytes[1:], []byte(request.Name))
-	return bytes
-}
-
-func SerializeCreatePersonalAccessToken(request iggcon.CreatePersonalAccessTokenRequest) []byte {
-	length := 1 + len(request.Name) + 8
-	bytes := make([]byte, length)
-	bytes[0] = byte(len(request.Name))
-	copy(bytes[1:], []byte(request.Name))
-	binary.LittleEndian.PutUint32(bytes[len(bytes)-4:], request.Expiry)
-	return bytes
-}
