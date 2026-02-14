@@ -15,24 +15,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package binaryserialization
+package iggcon
 
-import (
-	iggcon "github.com/apache/iggy/foreign/go/contracts"
-)
+type GetStreams struct{}
 
-type TcpUpdateStreamRequest struct {
-	StreamId iggcon.Identifier `json:"streamId"`
-	Name     string            `json:"name"`
+func (g GetStreams) Code() CommandCode {
+	return GetStreamsCode
 }
 
-func (request *TcpUpdateStreamRequest) Serialize() []byte {
-	streamIdBytes := SerializeIdentifier(request.StreamId)
-	nameLength := len(request.Name)
-	bytes := make([]byte, len(streamIdBytes)+1+nameLength)
-	copy(bytes[0:len(streamIdBytes)], streamIdBytes)
-	position := len(streamIdBytes)
-	bytes[position] = byte(nameLength)
-	copy(bytes[position+1:], []byte(request.Name))
-	return bytes
+func (g GetStreams) MarshalBinary() ([]byte, error) {
+	return []byte{}, nil
 }

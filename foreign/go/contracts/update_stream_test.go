@@ -15,23 +15,24 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package binaryserialization
+package iggcon
 
 import (
 	"bytes"
 	"testing"
-
-	iggcon "github.com/apache/iggy/foreign/go/contracts"
 )
 
 func TestSerialize_UpdateStream(t *testing.T) {
-	streamId, _ := iggcon.NewIdentifier("stream")
-	request := TcpUpdateStreamRequest{
+	streamId, _ := NewIdentifier("stream")
+	request := UpdateStream{
 		StreamId: streamId,
 		Name:     "update_stream",
 	}
 
-	serialized1 := request.Serialize()
+	serialized1, err := request.MarshalBinary()
+	if err != nil {
+		t.Errorf("Failed to serialize UpdateStream: %v", err)
+	}
 
 	expected := []byte{
 		0x02,                               // StreamId Kind (StringId)
