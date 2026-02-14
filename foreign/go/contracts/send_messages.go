@@ -34,11 +34,11 @@ type SendMessages struct {
 
 const indexSize = 16
 
-func (s SendMessages) Code() CommandCode {
+func (s *SendMessages) Code() CommandCode {
 	return SendMessagesCode
 }
 
-func (s SendMessages) MarshalBinary() ([]byte, error) {
+func (s *SendMessages) MarshalBinary() ([]byte, error) {
 	for i, message := range s.Messages {
 		switch s.Compression {
 		case MESSAGE_COMPRESSION_S2:

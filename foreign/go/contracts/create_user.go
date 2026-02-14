@@ -26,11 +26,11 @@ type CreateUser struct {
 	Permissions *Permissions `json:"Permissions,omitempty"`
 }
 
-func (c CreateUser) Code() CommandCode {
+func (c *CreateUser) Code() CommandCode {
 	return CreateUserCode
 }
 
-func (c CreateUser) MarshalBinary() ([]byte, error) {
+func (c *CreateUser) MarshalBinary() ([]byte, error) {
 	capacity := 4 + len(c.Username) + len(c.Password)
 	if c.Permissions != nil {
 		capacity += 1 + 4 + c.Permissions.Size()

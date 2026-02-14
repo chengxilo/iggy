@@ -19,10 +19,10 @@ package iggcon
 
 type GetStats struct{}
 
-func (c GetStats) Code() CommandCode {
+func (c *GetStats) Code() CommandCode {
 	return GetStatsCode
 }
 
-func (c GetStats) MarshalBinary() ([]byte, error) {
+func (c *GetStats) MarshalBinary() ([]byte, error) {
 	return []byte{}, nil
 }

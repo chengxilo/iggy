@@ -23,7 +23,7 @@ import (
 )
 
 func (c *IggyTcpClient) GetClients() ([]iggcon.ClientInfo, error) {
-	buffer, err := c.do(iggcon.GetClients{})
+	buffer, err := c.do(&iggcon.GetClients{})
 	if err != nil {
 		return nil, err
 	}
@@ -32,7 +32,7 @@ func (c *IggyTcpClient) GetClients() ([]iggcon.ClientInfo, error) {
 }
 
 func (c *IggyTcpClient) GetClient(clientId uint32) (*iggcon.ClientInfoDetails, error) {
-	buffer, err := c.do(iggcon.GetClient{ClientID: clientId})
+	buffer, err := c.do(&iggcon.GetClient{ClientID: clientId})
 	if err != nil {
 		return nil, err
 	}

@@ -26,11 +26,11 @@ const (
 	payloadOffset    = 1
 )
 
-func (request CreateStream) Code() CommandCode {
+func (request *CreateStream) Code() CommandCode {
 	return CreateStreamCode
 }
 
-func (request CreateStream) MarshalBinary() ([]byte, error) {
+func (request *CreateStream) MarshalBinary() ([]byte, error) {
 	nameLength := len(request.Name)
 	serialized := make([]byte, payloadOffset+nameLength)
 	serialized[nameLengthOffset] = byte(nameLength)

@@ -27,7 +27,7 @@ import (
 )
 
 func (c *IggyTcpClient) LoginUser(username string, password string) (*iggcon.IdentityInfo, error) {
-	buffer, err := c.do(iggcon.LoginUser{
+	buffer, err := c.do(&iggcon.LoginUser{
 		Username: username,
 		Password: password,
 	})
@@ -50,7 +50,7 @@ func (c *IggyTcpClient) LoginUser(username string, password string) (*iggcon.Ide
 }
 
 func (c *IggyTcpClient) LoginWithPersonalAccessToken(token string) (*iggcon.IdentityInfo, error) {
-	buffer, err := c.do(iggcon.LoginWithPersonalAccessToken{
+	buffer, err := c.do(&iggcon.LoginWithPersonalAccessToken{
 		Token: token,
 	})
 	if err != nil {
@@ -72,7 +72,7 @@ func (c *IggyTcpClient) LoginWithPersonalAccessToken(token string) (*iggcon.Iden
 }
 
 func (c *IggyTcpClient) LogoutUser() error {
-	_, err := c.do(iggcon.LogoutUser{})
+	_, err := c.do(&iggcon.LogoutUser{})
 	return err
 }
 

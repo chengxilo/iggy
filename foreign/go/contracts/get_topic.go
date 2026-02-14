@@ -22,10 +22,10 @@ type GetTopic struct {
 	TopicId  Identifier
 }
 
-func (g GetTopic) Code() CommandCode {
+func (g *GetTopic) Code() CommandCode {
 	return GetTopicCode
 }
 
-func (g GetTopic) MarshalBinary() ([]byte, error) {
+func (g *GetTopic) MarshalBinary() ([]byte, error) {
 	return marshalIdentifiers(g.StreamId, g.TopicId)
 }
