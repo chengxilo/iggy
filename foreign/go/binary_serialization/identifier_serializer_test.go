@@ -18,6 +18,7 @@
 package binaryserialization
 
 import (
+	"bytes"
 	"errors"
 	"testing"
 
@@ -41,7 +42,7 @@ func TestSerializeIdentifier_StringId(t *testing.T) {
 	}
 
 	// Check if the serialized bytes match the expected bytes
-	if !areBytesEqual(serialized, expected) {
+	if !bytes.Equal(serialized, expected) {
 		t.Errorf("Serialized bytes are incorrect for StringId. \nExpected:\t%v\nGot:\t\t%v", expected, serialized)
 	}
 }
@@ -61,7 +62,7 @@ func TestSerializeIdentifier_NumericId(t *testing.T) {
 	}
 
 	// Check if the serialized bytes match the expected bytes
-	if !areBytesEqual(serialized, expected) {
+	if !bytes.Equal(serialized, expected) {
 		t.Errorf("Serialized bytes are incorrect for NumericId. \nExpected:\t%v\nGot:\t\t%v", expected, serialized)
 	}
 }
