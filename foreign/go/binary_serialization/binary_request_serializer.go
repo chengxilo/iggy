@@ -264,11 +264,3 @@ func SerializeUpdateUserPermissionsRequest(request iggcon.UpdatePermissionsReque
 
 	return bytes
 }
-
-func SerializeLoginWithPersonalAccessToken(request iggcon.LoginWithPersonalAccessTokenRequest) []byte {
-	length := 1 + len(request.Token)
-	bytes := make([]byte, length)
-	bytes[0] = byte(len(request.Token))
-	copy(bytes[1:], []byte(request.Token))
-	return bytes
-}
