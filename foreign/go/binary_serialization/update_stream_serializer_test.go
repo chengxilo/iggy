@@ -18,6 +18,7 @@
 package binaryserialization
 
 import (
+	"bytes"
 	"testing"
 
 	iggcon "github.com/apache/iggy/foreign/go/contracts"
@@ -40,7 +41,7 @@ func TestSerialize_UpdateStream(t *testing.T) {
 		0x75, 0x70, 0x64, 0x61, 0x74, 0x65, 0x5F, 0x73, 0x74, 0x72, 0x65, 0x61, 0x6D, // Name ("update_stream")
 	}
 
-	if !areBytesEqual(serialized1, expected) {
+	if !bytes.Equal(serialized1, expected) {
 		t.Errorf("Test case 1 failed. \nExpected:\t%v\nGot:\t\t%v", expected, serialized1)
 	}
 }
