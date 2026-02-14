@@ -15,21 +15,16 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package binaryserialization
+package iggcon
 
-type TcpCreateStreamRequest struct {
-	Name string
+type GetStream struct {
+	StreamId Identifier
 }
 
-const (
-	nameLengthOffset = 0
-	payloadOffset    = 1
-)
+func (g GetStream) Code() CommandCode {
+	return GetStreamCode
+}
 
-func (request *TcpCreateStreamRequest) Serialize() []byte {
-	nameLength := len(request.Name)
-	serialized := make([]byte, payloadOffset+nameLength)
-	serialized[nameLengthOffset] = byte(nameLength)
-	copy(serialized[payloadOffset:], []byte(request.Name))
-	return serialized
+func (g GetStream) MarshalBinary() ([]byte, error) {
+	return g.StreamId.MarshalBinary()
 }
