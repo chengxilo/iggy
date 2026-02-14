@@ -24,11 +24,11 @@ type LoginUser struct {
 	Password string `json:"password"`
 }
 
-func (lu LoginUser) Code() CommandCode {
+func (lu *LoginUser) Code() CommandCode {
 	return LoginUserCode
 }
 
-func (lu LoginUser) MarshalBinary() ([]byte, error) {
+func (lu *LoginUser) MarshalBinary() ([]byte, error) {
 	usernameBytes := []byte(lu.Username)
 	passwordBytes := []byte(lu.Password)
 	versionBytes := []byte("")
@@ -71,11 +71,11 @@ type LoginWithPersonalAccessToken struct {
 	Token string `json:"token"`
 }
 
-func (lw LoginWithPersonalAccessToken) Code() CommandCode {
+func (lw *LoginWithPersonalAccessToken) Code() CommandCode {
 	return LoginWithAccessTokenCode
 }
 
-func (lw LoginWithPersonalAccessToken) MarshalBinary() ([]byte, error) {
+func (lw *LoginWithPersonalAccessToken) MarshalBinary() ([]byte, error) {
 	length := 1 + len(lw.Token)
 	bytes := make([]byte, length)
 	bytes[0] = byte(len(lw.Token))
@@ -92,10 +92,10 @@ type IdentityInfo struct {
 
 type LogoutUser struct{}
 
-func (lu LogoutUser) Code() CommandCode {
+func (lu *LogoutUser) Code() CommandCode {
 	return LogoutUserCode
 }
 
-func (lu LogoutUser) MarshalBinary() ([]byte, error) {
+func (lu *LogoutUser) MarshalBinary() ([]byte, error) {
 	return []byte{}, nil
 }

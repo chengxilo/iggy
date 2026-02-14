@@ -36,7 +36,7 @@ func (c *IggyTcpClient) SendMessages(
 	if len(messages) == 0 {
 		return ierror.ErrInvalidMessagesCount
 	}
-	_, err := c.do(iggcon.SendMessages{
+	_, err := c.do(&iggcon.SendMessages{
 		Compression:  c.MessageCompression,
 		StreamId:     streamId,
 		TopicId:      topicId,
@@ -55,7 +55,7 @@ func (c *IggyTcpClient) PollMessages(
 	autoCommit bool,
 	partitionId *uint32,
 ) (*iggcon.PolledMessage, error) {
-	buffer, err := c.do(iggcon.PollMessages{
+	buffer, err := c.do(&iggcon.PollMessages{
 		StreamId:    streamId,
 		TopicId:     topicId,
 		Consumer:    consumer,

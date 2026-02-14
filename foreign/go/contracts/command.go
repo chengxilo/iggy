@@ -31,11 +31,11 @@ type Command interface {
 
 type GetClients struct{}
 
-func (c GetClients) Code() CommandCode {
+func (c *GetClients) Code() CommandCode {
 	return GetClientsCode
 }
 
-func (c GetClients) MarshalBinary() ([]byte, error) {
+func (c *GetClients) MarshalBinary() ([]byte, error) {
 	return []byte{}, nil
 }
 
@@ -43,11 +43,11 @@ type GetClient struct {
 	ClientID uint32
 }
 
-func (c GetClient) Code() CommandCode {
+func (c *GetClient) Code() CommandCode {
 	return GetClientCode
 }
 
-func (c GetClient) MarshalBinary() ([]byte, error) {
+func (c *GetClient) MarshalBinary() ([]byte, error) {
 	bytes := make([]byte, 4)
 	binary.LittleEndian.PutUint32(bytes, c.ClientID)
 	return bytes, nil

@@ -23,7 +23,7 @@ import (
 )
 
 func (c *IggyTcpClient) GetConsumerOffset(consumer iggcon.Consumer, streamId iggcon.Identifier, topicId iggcon.Identifier, partitionId *uint32) (*iggcon.ConsumerOffsetInfo, error) {
-	buffer, err := c.do(iggcon.GetConsumerOffset{
+	buffer, err := c.do(&iggcon.GetConsumerOffset{
 		StreamId:    streamId,
 		TopicId:     topicId,
 		Consumer:    consumer,
@@ -37,7 +37,7 @@ func (c *IggyTcpClient) GetConsumerOffset(consumer iggcon.Consumer, streamId igg
 }
 
 func (c *IggyTcpClient) StoreConsumerOffset(consumer iggcon.Consumer, streamId iggcon.Identifier, topicId iggcon.Identifier, offset uint64, partitionId *uint32) error {
-	_, err := c.do(iggcon.StoreConsumerOffsetRequest{
+	_, err := c.do(&iggcon.StoreConsumerOffsetRequest{
 		StreamId:    streamId,
 		TopicId:     topicId,
 		Offset:      offset,
@@ -48,7 +48,7 @@ func (c *IggyTcpClient) StoreConsumerOffset(consumer iggcon.Consumer, streamId i
 }
 
 func (c *IggyTcpClient) DeleteConsumerOffset(consumer iggcon.Consumer, streamId iggcon.Identifier, topicId iggcon.Identifier, partitionId *uint32) error {
-	_, err := c.do(iggcon.DeleteConsumerOffset{
+	_, err := c.do(&iggcon.DeleteConsumerOffset{
 		Consumer:    consumer,
 		StreamId:    streamId,
 		TopicId:     topicId,

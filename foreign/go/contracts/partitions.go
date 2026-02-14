@@ -39,11 +39,11 @@ type CreatePartitions struct {
 	PartitionsCount uint32     `json:"partitionsCount"`
 }
 
-func (c CreatePartitions) Code() CommandCode {
+func (c *CreatePartitions) Code() CommandCode {
 	return CreatePartitionsCode
 }
 
-func (c CreatePartitions) MarshalBinary() ([]byte, error) {
+func (c *CreatePartitions) MarshalBinary() ([]byte, error) {
 	streamIdBytes, err := c.StreamId.MarshalBinary()
 	if err != nil {
 		return nil, err
@@ -69,11 +69,11 @@ type DeletePartitions struct {
 	PartitionsCount uint32     `json:"partitionsCount"`
 }
 
-func (d DeletePartitions) Code() CommandCode {
+func (d *DeletePartitions) Code() CommandCode {
 	return DeletePartitionsCode
 }
 
-func (d DeletePartitions) MarshalBinary() ([]byte, error) {
+func (d *DeletePartitions) MarshalBinary() ([]byte, error) {
 	streamIdBytes, err := d.StreamId.MarshalBinary()
 	if err != nil {
 		return nil, err

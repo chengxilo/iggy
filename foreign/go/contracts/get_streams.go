@@ -19,10 +19,10 @@ package iggcon
 
 type GetStreams struct{}
 
-func (g GetStreams) Code() CommandCode {
+func (g *GetStreams) Code() CommandCode {
 	return GetStreamsCode
 }
 
-func (g GetStreams) MarshalBinary() ([]byte, error) {
+func (g *GetStreams) MarshalBinary() ([]byte, error) {
 	return []byte{}, nil
 }

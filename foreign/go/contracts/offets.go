@@ -27,11 +27,11 @@ type StoreConsumerOffsetRequest struct {
 	Offset      uint64     `json:"offset"`
 }
 
-func (s StoreConsumerOffsetRequest) Code() CommandCode {
+func (s *StoreConsumerOffsetRequest) Code() CommandCode {
 	return StoreOffsetCode
 }
 
-func (s StoreConsumerOffsetRequest) MarshalBinary() ([]byte, error) {
+func (s *StoreConsumerOffsetRequest) MarshalBinary() ([]byte, error) {
 	hasPartition := byte(0)
 	var partition uint32 = 0
 	if s.PartitionId != nil {
@@ -72,11 +72,11 @@ type GetConsumerOffset struct {
 	PartitionId *uint32    `json:"partitionId"`
 }
 
-func (g GetConsumerOffset) Code() CommandCode {
+func (g *GetConsumerOffset) Code() CommandCode {
 	return GetOffsetCode
 }
 
-func (g GetConsumerOffset) MarshalBinary() ([]byte, error) {
+func (g *GetConsumerOffset) MarshalBinary() ([]byte, error) {
 	hasPartition := byte(0)
 	var partition uint32 = 0
 	if g.PartitionId != nil {
@@ -122,11 +122,11 @@ type DeleteConsumerOffset struct {
 	PartitionId *uint32
 }
 
-func (d DeleteConsumerOffset) Code() CommandCode {
+func (d *DeleteConsumerOffset) Code() CommandCode {
 	return DeleteConsumerOffsetCode
 }
 
-func (d DeleteConsumerOffset) MarshalBinary() ([]byte, error) {
+func (d *DeleteConsumerOffset) MarshalBinary() ([]byte, error) {
 	hasPartition := byte(0)
 	var partition uint32 = 0
 	if d.PartitionId != nil {

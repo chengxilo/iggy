@@ -24,7 +24,7 @@ import (
 )
 
 func (c *IggyTcpClient) GetConsumerGroups(streamId, topicId iggcon.Identifier) ([]iggcon.ConsumerGroup, error) {
-	buffer, err := c.do(iggcon.GetConsumerGroups{
+	buffer, err := c.do(&iggcon.GetConsumerGroups{
 		StreamId: streamId,
 		TopicId:  topicId,
 	})
@@ -36,7 +36,7 @@ func (c *IggyTcpClient) GetConsumerGroups(streamId, topicId iggcon.Identifier) (
 }
 
 func (c *IggyTcpClient) GetConsumerGroup(streamId, topicId, groupId iggcon.Identifier) (*iggcon.ConsumerGroupDetails, error) {
-	buffer, err := c.do(iggcon.GetConsumerGroup{
+	buffer, err := c.do(&iggcon.GetConsumerGroup{
 		StreamId: streamId,
 		TopicId:  topicId,
 		GroupId:  groupId,
@@ -56,7 +56,7 @@ func (c *IggyTcpClient) CreateConsumerGroup(streamId iggcon.Identifier, topicId 
 	if MaxStringLength < len(name) || len(name) == 0 {
 		return nil, ierror.ErrInvalidConsumerGroupName
 	}
-	buffer, err := c.do(iggcon.CreateConsumerGroup{
+	buffer, err := c.do(&iggcon.CreateConsumerGroup{
 		StreamId: streamId,
 		TopicId:  topicId,
 		Name:     name,
@@ -69,7 +69,7 @@ func (c *IggyTcpClient) CreateConsumerGroup(streamId iggcon.Identifier, topicId 
 }
 
 func (c *IggyTcpClient) DeleteConsumerGroup(streamId iggcon.Identifier, topicId iggcon.Identifier, groupId iggcon.Identifier) error {
-	_, err := c.do(iggcon.DeleteConsumerGroup{
+	_, err := c.do(&iggcon.DeleteConsumerGroup{
 		StreamId:        streamId,
 		TopicId:         topicId,
 		ConsumerGroupId: groupId,
@@ -78,7 +78,7 @@ func (c *IggyTcpClient) DeleteConsumerGroup(streamId iggcon.Identifier, topicId 
 }
 
 func (c *IggyTcpClient) JoinConsumerGroup(streamId iggcon.Identifier, topicId iggcon.Identifier, groupId iggcon.Identifier) error {
-	_, err := c.do(iggcon.JoinConsumerGroup{
+	_, err := c.do(&iggcon.JoinConsumerGroup{
 		StreamId:        streamId,
 		TopicId:         topicId,
 		ConsumerGroupId: groupId,
@@ -87,7 +87,7 @@ func (c *IggyTcpClient) JoinConsumerGroup(streamId iggcon.Identifier, topicId ig
 }
 
 func (c *IggyTcpClient) LeaveConsumerGroup(streamId iggcon.Identifier, topicId iggcon.Identifier, groupId iggcon.Identifier) error {
-	_, err := c.do(iggcon.LeaveConsumerGroup{
+	_, err := c.do(&iggcon.LeaveConsumerGroup{
 		StreamId:        streamId,
 		TopicId:         topicId,
 		ConsumerGroupId: groupId,

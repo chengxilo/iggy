@@ -24,11 +24,11 @@ type UpdatePermissions struct {
 	Permissions *Permissions `json:"Permissions,omitempty"`
 }
 
-func (u UpdatePermissions) Code() CommandCode {
+func (u *UpdatePermissions) Code() CommandCode {
 	return UpdatePermissionsCode
 }
 
-func (u UpdatePermissions) MarshalBinary() ([]byte, error) {
+func (u *UpdatePermissions) MarshalBinary() ([]byte, error) {
 	userIdBytes, err := u.UserID.MarshalBinary()
 	if err != nil {
 		return nil, err

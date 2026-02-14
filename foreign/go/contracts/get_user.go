@@ -21,10 +21,10 @@ type GetUser struct {
 	Id Identifier
 }
 
-func (c GetUser) Code() CommandCode {
+func (c *GetUser) Code() CommandCode {
 	return GetUserCode
 }
 
-func (c GetUser) MarshalBinary() ([]byte, error) {
+func (c *GetUser) MarshalBinary() ([]byte, error) {
 	return c.Id.MarshalBinary()
 }

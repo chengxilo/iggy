@@ -19,10 +19,10 @@ package iggcon
 
 type Ping struct{}
 
-func (p Ping) Code() CommandCode {
+func (p *Ping) Code() CommandCode {
 	return PingCode
 }
 
-func (p Ping) MarshalBinary() ([]byte, error) {
+func (p *Ping) MarshalBinary() ([]byte, error) {
 	return []byte{}, nil
 }

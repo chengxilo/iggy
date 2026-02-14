@@ -22,10 +22,10 @@ type DeleteTopic struct {
 	TopicId  Identifier
 }
 
-func (d DeleteTopic) Code() CommandCode {
+func (d *DeleteTopic) Code() CommandCode {
 	return DeleteTopicCode
 }
 
-func (d DeleteTopic) MarshalBinary() ([]byte, error) {
+func (d *DeleteTopic) MarshalBinary() ([]byte, error) {
 	return marshalIdentifiers(d.StreamId, d.TopicId)
 }

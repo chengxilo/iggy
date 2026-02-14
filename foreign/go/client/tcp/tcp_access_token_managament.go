@@ -23,7 +23,7 @@ import (
 )
 
 func (c *IggyTcpClient) CreatePersonalAccessToken(name string, expiry uint32) (*iggcon.RawPersonalAccessToken, error) {
-	buffer, err := c.do(iggcon.CreatePersonalAccessToken{
+	buffer, err := c.do(&iggcon.CreatePersonalAccessToken{
 		Name:   name,
 		Expiry: expiry,
 	})
@@ -35,14 +35,14 @@ func (c *IggyTcpClient) CreatePersonalAccessToken(name string, expiry uint32) (*
 }
 
 func (c *IggyTcpClient) DeletePersonalAccessToken(name string) error {
-	_, err := c.do(iggcon.DeletePersonalAccessToken{
+	_, err := c.do(&iggcon.DeletePersonalAccessToken{
 		Name: name,
 	})
 	return err
 }
 
 func (c *IggyTcpClient) GetPersonalAccessTokens() ([]iggcon.PersonalAccessTokenInfo, error) {
-	buffer, err := c.do(iggcon.GetPersonalAccessTokens{})
+	buffer, err := c.do(&iggcon.GetPersonalAccessTokens{})
 	if err != nil {
 		return nil, err
 	}

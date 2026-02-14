@@ -39,11 +39,11 @@ type PollMessages struct {
 	AutoCommit  bool            `json:"autoCommit"`
 }
 
-func (m PollMessages) Code() CommandCode {
+func (m *PollMessages) Code() CommandCode {
 	return PollMessagesCode
 }
 
-func (m PollMessages) MarshalBinary() ([]byte, error) {
+func (m *PollMessages) MarshalBinary() ([]byte, error) {
 	consumerIdBytes, err := m.Consumer.Id.MarshalBinary()
 	if err != nil {
 		return nil, err

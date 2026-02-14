@@ -21,10 +21,10 @@ type GetStream struct {
 	StreamId Identifier
 }
 
-func (g GetStream) Code() CommandCode {
+func (g *GetStream) Code() CommandCode {
 	return GetStreamCode
 }
 
-func (g GetStream) MarshalBinary() ([]byte, error) {
+func (g *GetStream) MarshalBinary() ([]byte, error) {
 	return g.StreamId.MarshalBinary()
 }

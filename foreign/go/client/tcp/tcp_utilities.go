@@ -23,7 +23,7 @@ import (
 )
 
 func (c *IggyTcpClient) GetStats() (*iggcon.Stats, error) {
-	buffer, err := c.do(iggcon.GetStats{})
+	buffer, err := c.do(&iggcon.GetStats{})
 	if err != nil {
 		return nil, err
 	}
@@ -35,6 +35,6 @@ func (c *IggyTcpClient) GetStats() (*iggcon.Stats, error) {
 }
 
 func (c *IggyTcpClient) Ping() error {
-	_, err := c.do(iggcon.Ping{})
+	_, err := c.do(&iggcon.Ping{})
 	return err
 }
