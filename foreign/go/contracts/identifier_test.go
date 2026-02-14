@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package binaryserialization
+package iggcon
 
 import (
 	"bytes"
@@ -23,16 +23,17 @@ import (
 	"testing"
 
 	ierror "github.com/apache/iggy/foreign/go/errors"
-
-	iggcon "github.com/apache/iggy/foreign/go/contracts"
 )
 
 func TestSerializeIdentifier_StringId(t *testing.T) {
 	// Test case for StringId
-	identifier, _ := iggcon.NewIdentifier("Hello")
+	identifier, _ := NewIdentifier("Hello")
 
 	// Serialize the identifier
-	serialized := SerializeIdentifier(identifier)
+	serialized, err := identifier.MarshalBinary()
+	if err != nil {
+		t.Errorf("Error serializing identifier: %v", err)
+	}
 
 	// Expected serialized bytes for StringId
 	expected := []byte{
@@ -49,10 +50,13 @@ func TestSerializeIdentifier_StringId(t *testing.T) {
 
 func TestSerializeIdentifier_NumericId(t *testing.T) {
 	// Test case for NumericId
-	identifier, _ := iggcon.NewIdentifier(uint32(123))
+	identifier, _ := NewIdentifier(uint32(123))
 
 	// Serialize the identifier
-	serialized := SerializeIdentifier(identifier)
+	serialized, err := identifier.MarshalBinary()
+	if err != nil {
+		t.Errorf("Error serializing identifier: %v", err)
+	}
 
 	// Expected serialized bytes for NumericId
 	expected := []byte{
@@ -69,7 +73,7 @@ func TestSerializeIdentifier_NumericId(t *testing.T) {
 
 func TestSerializeIdentifier_EmptyStringId(t *testing.T) {
 	// Test case for an empty StringId
-	_, err := iggcon.NewIdentifier("")
+	_, err := NewIdentifier("")
 
 	// Check if the serialized bytes match the expected bytes
 	if !errors.Is(err, ierror.ErrInvalidIdentifier) {
