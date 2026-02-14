@@ -378,12 +378,6 @@ func SerializeUpdateUserPermissionsRequest(request iggcon.UpdatePermissionsReque
 	return bytes
 }
 
-func SerializeUint32(value uint32) []byte {
-	bytes := make([]byte, 4)
-	binary.LittleEndian.PutUint32(bytes, value)
-	return bytes
-}
-
 func SerializeLoginWithPersonalAccessToken(request iggcon.LoginWithPersonalAccessTokenRequest) []byte {
 	length := 1 + len(request.Token)
 	bytes := make([]byte, length)
