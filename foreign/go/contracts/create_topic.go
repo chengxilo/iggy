@@ -31,11 +31,11 @@ type CreateTopic struct {
 	ReplicationFactor    *uint8               `json:"replicationFactor"`
 }
 
-func (t CreateTopic) Code() CommandCode {
+func (t *CreateTopic) Code() CommandCode {
 	return CreateTopicCode
 }
 
-func (t CreateTopic) MarshalBinary() ([]byte, error) {
+func (t *CreateTopic) MarshalBinary() ([]byte, error) {
 	if t.ReplicationFactor == nil {
 		t.ReplicationFactor = new(uint8)
 	}

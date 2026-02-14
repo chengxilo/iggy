@@ -21,10 +21,10 @@ type DeleteUser struct {
 	Id Identifier
 }
 
-func (d DeleteUser) Code() CommandCode {
+func (d *DeleteUser) Code() CommandCode {
 	return DeleteUserCode
 }
 
-func (d DeleteUser) MarshalBinary() ([]byte, error) {
+func (d *DeleteUser) MarshalBinary() ([]byte, error) {
 	return d.Id.MarshalBinary()
 }

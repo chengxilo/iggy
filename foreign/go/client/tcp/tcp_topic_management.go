@@ -24,7 +24,7 @@ import (
 )
 
 func (c *IggyTcpClient) GetTopics(streamId iggcon.Identifier) ([]iggcon.Topic, error) {
-	buffer, err := c.do(iggcon.GetTopics{StreamId: streamId})
+	buffer, err := c.do(&iggcon.GetTopics{StreamId: streamId})
 	if err != nil {
 		return nil, err
 	}
@@ -33,7 +33,7 @@ func (c *IggyTcpClient) GetTopics(streamId iggcon.Identifier) ([]iggcon.Topic, e
 }
 
 func (c *IggyTcpClient) GetTopic(streamId iggcon.Identifier, topicId iggcon.Identifier) (*iggcon.TopicDetails, error) {
-	buffer, err := c.do(iggcon.GetTopic{StreamId: streamId, TopicId: topicId})
+	buffer, err := c.do(&iggcon.GetTopic{StreamId: streamId, TopicId: topicId})
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +68,7 @@ func (c *IggyTcpClient) CreateTopic(
 		return nil, ierror.ErrInvalidReplicationFactor
 	}
 
-	buffer, err := c.do(iggcon.CreateTopic{
+	buffer, err := c.do(&iggcon.CreateTopic{
 		StreamId:             streamId,
 		Name:                 name,
 		PartitionsCount:      partitionsCount,
@@ -99,7 +99,7 @@ func (c *IggyTcpClient) UpdateTopic(
 	if replicationFactor != nil && *replicationFactor == 0 {
 		return ierror.ErrInvalidReplicationFactor
 	}
-	_, err := c.do(iggcon.UpdateTopic{
+	_, err := c.do(&iggcon.UpdateTopic{
 		StreamId:             streamId,
 		TopicId:              topicId,
 		CompressionAlgorithm: compressionAlgorithm,
@@ -112,6 +112,6 @@ func (c *IggyTcpClient) UpdateTopic(
 }
 
 func (c *IggyTcpClient) DeleteTopic(streamId, topicId iggcon.Identifier) error {
-	_, err := c.do(iggcon.DeleteTopic{StreamId: streamId, TopicId: topicId})
+	_, err := c.do(&iggcon.DeleteTopic{StreamId: streamId, TopicId: topicId})
 	return err
 }

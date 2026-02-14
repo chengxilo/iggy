@@ -19,10 +19,10 @@ package iggcon
 
 type GetUsers struct{}
 
-func (g GetUsers) Code() CommandCode {
+func (g *GetUsers) Code() CommandCode {
 	return GetUsersCode
 }
 
-func (g GetUsers) MarshalBinary() ([]byte, error) {
+func (g *GetUsers) MarshalBinary() ([]byte, error) {
 	return []byte{}, nil
 }

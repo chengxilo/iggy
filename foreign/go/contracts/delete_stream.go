@@ -21,10 +21,10 @@ type DeleteStream struct {
 	StreamId Identifier
 }
 
-func (d DeleteStream) Code() CommandCode {
+func (d *DeleteStream) Code() CommandCode {
 	return DeleteStreamCode
 }
 
-func (d DeleteStream) MarshalBinary() ([]byte, error) {
+func (d *DeleteStream) MarshalBinary() ([]byte, error) {
 	return d.StreamId.MarshalBinary()
 }

@@ -23,11 +23,11 @@ type UpdateUser struct {
 	Status   *UserStatus `json:"userStatus"`
 }
 
-func (u UpdateUser) Code() CommandCode {
+func (u *UpdateUser) Code() CommandCode {
 	return UpdateUserCode
 }
 
-func (u UpdateUser) MarshalBinary() ([]byte, error) {
+func (u *UpdateUser) MarshalBinary() ([]byte, error) {
 	userIdBytes, err := u.UserID.MarshalBinary()
 	if err != nil {
 		return nil, err

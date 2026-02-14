@@ -27,11 +27,11 @@ type CreatePersonalAccessToken struct {
 	Expiry uint32 `json:"Expiry"`
 }
 
-func (c CreatePersonalAccessToken) Code() CommandCode {
+func (c *CreatePersonalAccessToken) Code() CommandCode {
 	return CreateAccessTokenCode
 }
 
-func (c CreatePersonalAccessToken) MarshalBinary() ([]byte, error) {
+func (c *CreatePersonalAccessToken) MarshalBinary() ([]byte, error) {
 	length := 1 + len(c.Name) + 8
 	bytes := make([]byte, length)
 	bytes[0] = byte(len(c.Name))
@@ -44,11 +44,11 @@ type DeletePersonalAccessToken struct {
 	Name string `json:"Name"`
 }
 
-func (d DeletePersonalAccessToken) Code() CommandCode {
+func (d *DeletePersonalAccessToken) Code() CommandCode {
 	return DeleteAccessTokenCode
 }
 
-func (d DeletePersonalAccessToken) MarshalBinary() ([]byte, error) {
+func (d *DeletePersonalAccessToken) MarshalBinary() ([]byte, error) {
 	length := 1 + len(d.Name)
 	bytes := make([]byte, length)
 	bytes[0] = byte(len(d.Name))
@@ -58,11 +58,11 @@ func (d DeletePersonalAccessToken) MarshalBinary() ([]byte, error) {
 
 type GetPersonalAccessTokens struct{}
 
-func (g GetPersonalAccessTokens) Code() CommandCode {
+func (g *GetPersonalAccessTokens) Code() CommandCode {
 	return GetAccessTokensCode
 }
 
-func (g GetPersonalAccessTokens) MarshalBinary() ([]byte, error) {
+func (g *GetPersonalAccessTokens) MarshalBinary() ([]byte, error) {
 	return []byte{}, nil
 }
 

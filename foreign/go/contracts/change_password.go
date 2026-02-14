@@ -23,11 +23,11 @@ type ChangePassword struct {
 	NewPassword     string     `json:"NewPassword"`
 }
 
-func (c ChangePassword) Code() CommandCode {
+func (c *ChangePassword) Code() CommandCode {
 	return ChangePasswordCode
 }
 
-func (c ChangePassword) MarshalBinary() ([]byte, error) {
+func (c *ChangePassword) MarshalBinary() ([]byte, error) {
 	userIdBytes, err := c.UserID.MarshalBinary()
 	if err != nil {
 		return nil, err

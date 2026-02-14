@@ -22,10 +22,10 @@ type UpdateStream struct {
 	Name     string     `json:"name"`
 }
 
-func (u UpdateStream) Code() CommandCode {
+func (u *UpdateStream) Code() CommandCode {
 	return UpdateStreamCode
 }
-func (u UpdateStream) MarshalBinary() ([]byte, error) {
+func (u *UpdateStream) MarshalBinary() ([]byte, error) {
 	streamIdBytes, err := u.StreamId.MarshalBinary()
 	if err != nil {
 		return nil, err

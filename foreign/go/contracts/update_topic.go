@@ -31,11 +31,11 @@ type UpdateTopic struct {
 	Name                 string               `json:"name"`
 }
 
-func (u UpdateTopic) Code() CommandCode {
+func (u *UpdateTopic) Code() CommandCode {
 	return UpdateTopicCode
 }
 
-func (u UpdateTopic) MarshalBinary() ([]byte, error) {
+func (u *UpdateTopic) MarshalBinary() ([]byte, error) {
 	if u.ReplicationFactor == nil {
 		u.ReplicationFactor = new(uint8)
 	}
