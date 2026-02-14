@@ -23,18 +23,6 @@ import (
 	iggcon "github.com/apache/iggy/foreign/go/contracts"
 )
 
-func CreateGroup(request iggcon.CreateConsumerGroupRequest) []byte {
-	streamIdBytes := SerializeIdentifier(request.StreamId)
-	topicIdBytes := SerializeIdentifier(request.TopicId)
-	offset := len(streamIdBytes) + len(topicIdBytes)
-	bytes := make([]byte, offset+1+len(request.Name))
-	copy(bytes[0:len(streamIdBytes)], streamIdBytes)
-	copy(bytes[len(streamIdBytes):offset], topicIdBytes)
-	bytes[offset] = byte(len(request.Name))
-	copy(bytes[offset+1:], request.Name)
-	return bytes
-}
-
 func UpdateOffset(request iggcon.StoreConsumerOffsetRequest) []byte {
 	hasPartition := byte(0)
 	var partition uint32 = 0
