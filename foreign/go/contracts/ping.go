@@ -15,26 +15,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package tcp
+package iggcon
 
-import (
-	binaryserialization "github.com/apache/iggy/foreign/go/binary_serialization"
-	iggcon "github.com/apache/iggy/foreign/go/contracts"
-)
+type Ping struct{}
 
-func (c *IggyTcpClient) GetStats() (*iggcon.Stats, error) {
-	buffer, err := c.do(iggcon.GetStats{})
-	if err != nil {
-		return nil, err
-	}
-
-	stats := &binaryserialization.TcpStats{}
-	err = stats.Deserialize(buffer)
-
-	return &stats.Stats, err
+func (p Ping) Code() CommandCode {
+	return PingCode
 }
 
-func (c *IggyTcpClient) Ping() error {
-	_, err := c.do(iggcon.Ping{})
-	return err
+func (p Ping) MarshalBinary() ([]byte, error) {
+	return []byte{}, nil
 }
