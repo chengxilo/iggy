@@ -23,34 +23,6 @@ import (
 	iggcon "github.com/apache/iggy/foreign/go/contracts"
 )
 
-func CreatePartitions(request iggcon.CreatePartitionsRequest) []byte {
-	streamIdBytes := SerializeIdentifier(request.StreamId)
-	topicIdBytes := SerializeIdentifier(request.TopicId)
-	bytes := make([]byte, len(streamIdBytes)+len(topicIdBytes)+4)
-	position := 0
-	copy(bytes[position:], streamIdBytes)
-	position += len(streamIdBytes)
-	copy(bytes[position:], topicIdBytes)
-	position += len(topicIdBytes)
-	binary.LittleEndian.PutUint32(bytes[position:position+4], uint32(request.PartitionsCount))
-
-	return bytes
-}
-
-func DeletePartitions(request iggcon.DeletePartitionsRequest) []byte {
-	streamIdBytes := SerializeIdentifier(request.StreamId)
-	topicIdBytes := SerializeIdentifier(request.TopicId)
-	bytes := make([]byte, len(streamIdBytes)+len(topicIdBytes)+4)
-	position := 0
-	copy(bytes[position:], streamIdBytes)
-	position += len(streamIdBytes)
-	copy(bytes[position:], topicIdBytes)
-	position += len(topicIdBytes)
-	binary.LittleEndian.PutUint32(bytes[position:position+4], uint32(request.PartitionsCount))
-
-	return bytes
-}
-
 //USERS
 
 func SerializeCreateUserRequest(request iggcon.CreateUserRequest) []byte {
