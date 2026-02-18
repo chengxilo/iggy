@@ -37,9 +37,11 @@ func (c *IggyTcpClient) GetConsumerGroups(streamId, topicId iggcon.Identifier) (
 
 func (c *IggyTcpClient) GetConsumerGroup(streamId, topicId, groupId iggcon.Identifier) (*iggcon.ConsumerGroupDetails, error) {
 	buffer, err := c.do(&iggcon.GetConsumerGroup{
-		StreamId: streamId,
-		TopicId:  topicId,
-		GroupId:  groupId,
+		TopicPath: iggcon.TopicPath{
+			StreamId: streamId,
+			TopicId:  topicId,
+		},
+		GroupId: groupId,
 	})
 	if err != nil {
 		return nil, err
@@ -57,9 +59,11 @@ func (c *IggyTcpClient) CreateConsumerGroup(streamId iggcon.Identifier, topicId 
 		return nil, ierror.ErrInvalidConsumerGroupName
 	}
 	buffer, err := c.do(&iggcon.CreateConsumerGroup{
-		StreamId: streamId,
-		TopicId:  topicId,
-		Name:     name,
+		TopicPath: iggcon.TopicPath{
+			StreamId: streamId,
+			TopicId:  topicId,
+		},
+		Name: name,
 	})
 	if err != nil {
 		return nil, err
@@ -70,27 +74,33 @@ func (c *IggyTcpClient) CreateConsumerGroup(streamId iggcon.Identifier, topicId 
 
 func (c *IggyTcpClient) DeleteConsumerGroup(streamId iggcon.Identifier, topicId iggcon.Identifier, groupId iggcon.Identifier) error {
 	_, err := c.do(&iggcon.DeleteConsumerGroup{
-		StreamId:        streamId,
-		TopicId:         topicId,
-		ConsumerGroupId: groupId,
+		TopicPath: iggcon.TopicPath{
+			StreamId: streamId,
+			TopicId:  topicId,
+		},
+		GroupId: groupId,
 	})
 	return err
 }
 
 func (c *IggyTcpClient) JoinConsumerGroup(streamId iggcon.Identifier, topicId iggcon.Identifier, groupId iggcon.Identifier) error {
 	_, err := c.do(&iggcon.JoinConsumerGroup{
-		StreamId:        streamId,
-		TopicId:         topicId,
-		ConsumerGroupId: groupId,
+		TopicPath: iggcon.TopicPath{
+			StreamId: streamId,
+			TopicId:  topicId,
+		},
+		GroupId: groupId,
 	})
 	return err
 }
 
 func (c *IggyTcpClient) LeaveConsumerGroup(streamId iggcon.Identifier, topicId iggcon.Identifier, groupId iggcon.Identifier) error {
 	_, err := c.do(&iggcon.LeaveConsumerGroup{
-		StreamId:        streamId,
-		TopicId:         topicId,
-		ConsumerGroupId: groupId,
+		TopicPath: iggcon.TopicPath{
+			StreamId: streamId,
+			TopicId:  topicId,
+		},
+		GroupId: groupId,
 	})
 	return err
 }

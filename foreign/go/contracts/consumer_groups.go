@@ -35,10 +35,14 @@ type ConsumerGroupMember struct {
 	Partitions      []uint32
 }
 
+type TopicPath struct {
+	StreamId Identifier
+	TopicId  Identifier
+}
+
 type CreateConsumerGroup struct {
-	StreamId Identifier `json:"streamId"`
-	TopicId  Identifier `json:"topicId"`
-	Name     string     `json:"name"`
+	TopicPath
+	Name string
 }
 
 func (c *CreateConsumerGroup) Code() CommandCode {
@@ -64,9 +68,8 @@ func (c *CreateConsumerGroup) MarshalBinary() ([]byte, error) {
 }
 
 type DeleteConsumerGroup struct {
-	StreamId        Identifier `json:"streamId"`
-	TopicId         Identifier `json:"topicId"`
-	ConsumerGroupId Identifier `json:"consumerGroupId"`
+	TopicPath
+	GroupId Identifier
 }
 
 func (d *DeleteConsumerGroup) Code() CommandCode {
@@ -74,13 +77,12 @@ func (d *DeleteConsumerGroup) Code() CommandCode {
 }
 
 func (d *DeleteConsumerGroup) MarshalBinary() ([]byte, error) {
-	return marshalIdentifiers(d.StreamId, d.TopicId, d.ConsumerGroupId)
+	return marshalIdentifiers(d.StreamId, d.TopicId, d.GroupId)
 }
 
 type JoinConsumerGroup struct {
-	StreamId        Identifier `json:"streamId"`
-	TopicId         Identifier `json:"topicId"`
-	ConsumerGroupId Identifier `json:"consumerGroupId"`
+	TopicPath
+	GroupId Identifier
 }
 
 func (j *JoinConsumerGroup) Code() CommandCode {
@@ -88,13 +90,12 @@ func (j *JoinConsumerGroup) Code() CommandCode {
 }
 
 func (j *JoinConsumerGroup) MarshalBinary() ([]byte, error) {
-	return marshalIdentifiers(j.StreamId, j.TopicId, j.ConsumerGroupId)
+	return marshalIdentifiers(j.StreamId, j.TopicId, j.GroupId)
 }
 
 type LeaveConsumerGroup struct {
-	StreamId        Identifier `json:"streamId"`
-	TopicId         Identifier `json:"topicId"`
-	ConsumerGroupId Identifier `json:"consumerGroupId"`
+	TopicPath
+	GroupId Identifier
 }
 
 func (l *LeaveConsumerGroup) Code() CommandCode {
@@ -102,13 +103,12 @@ func (l *LeaveConsumerGroup) Code() CommandCode {
 }
 
 func (l *LeaveConsumerGroup) MarshalBinary() ([]byte, error) {
-	return marshalIdentifiers(l.StreamId, l.TopicId, l.ConsumerGroupId)
+	return marshalIdentifiers(l.StreamId, l.TopicId, l.GroupId)
 }
 
 type GetConsumerGroup struct {
-	StreamId Identifier
-	TopicId  Identifier
-	GroupId  Identifier
+	TopicPath
+	GroupId Identifier
 }
 
 func (g *GetConsumerGroup) Code() CommandCode {
@@ -133,7 +133,7 @@ func (g *GetConsumerGroups) MarshalBinary() ([]byte, error) {
 }
 
 type ConsumerGroupInfo struct {
-	StreamId        uint32 `json:"streamId"`
-	TopicId         uint32 `json:"topicId"`
-	ConsumerGroupId uint32 `json:"consumerGroupId"`
+	StreamId uint32 `json:"streamId"`
+	TopicId  uint32 `json:"topicId"`
+	GroupId  uint32 `json:"groupId"`
 }
