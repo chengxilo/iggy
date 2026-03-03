@@ -295,16 +295,18 @@ func (c *IggyTcpClient) connect() error {
 			time.Sleep(remaining)
 		}
 	}
-
+	attempts := uint(1)
+	interval := time.Duration(0)
+	if c.config.reconnection.enabled {
+		attempts = uint(c.config.reconnection.maxRetries)
+		interval = c.config.reconnection.interval
+	}
 	// TODO handle tls logic
 	var conn net.Conn
 	if err := retry.Do(
 		func() error {
 			connection, err := net.Dial("tcp", c.currentServerAddress)
 			if err != nil {
-				if !c.config.reconnection.enabled {
-					return retry.Unrecoverable(ierror.ErrCannotEstablishConnection)
-				}
 				return ierror.ErrCannotEstablishConnection
 			}
 
@@ -323,8 +325,8 @@ func (c *IggyTcpClient) connect() error {
 			// TODO TLS logic
 			return errors.New("TLS connection is not implemented yet")
 		},
-		retry.Attempts(uint(c.config.reconnection.maxRetries)),
-		retry.Delay(c.config.reconnection.interval),
+		retry.Attempts(attempts),
+		retry.Delay(interval),
 	); err != nil {
 		c.mtx.Lock()
 		c.state = iggcon.StateDisconnected
