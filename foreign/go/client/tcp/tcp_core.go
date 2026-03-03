@@ -305,11 +305,6 @@ func (c *IggyTcpClient) connect() error {
 				if !c.config.reconnection.enabled {
 					return retry.Unrecoverable(ierror.ErrCannotEstablishConnection)
 				}
-
-				c.mtx.Lock()
-				c.state = iggcon.StateDisconnected
-				c.mtx.Unlock()
-				// TODO publish event disconnected
 				return ierror.ErrCannotEstablishConnection
 			}
 
@@ -331,6 +326,10 @@ func (c *IggyTcpClient) connect() error {
 		retry.Attempts(uint(c.config.reconnection.maxRetries)),
 		retry.Delay(c.config.reconnection.interval),
 	); err != nil {
+		c.mtx.Lock()
+		c.state = iggcon.StateDisconnected
+		c.mtx.Unlock()
+		// TODO publish event disconnected
 		return err
 	}
 
