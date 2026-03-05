@@ -42,7 +42,7 @@ type SendMessages struct {
 	Messages     []iggcon.IggyMessage `json:"messages"`
 }
 
-func (s *SendMessages) Code() CommandCode {
+func (s *SendMessages) Code() Code {
 	return SendMessagesCode
 }
 
@@ -161,7 +161,7 @@ type PollMessages struct {
 	AutoCommit  bool                   `json:"autoCommit"`
 }
 
-func (m *PollMessages) Code() CommandCode {
+func (m *PollMessages) Code() Code {
 	return PollMessagesCode
 }
 

@@ -24,7 +24,7 @@ type CreatePersonalAccessToken struct {
 	Expiry uint32 `json:"Expiry"`
 }
 
-func (c *CreatePersonalAccessToken) Code() CommandCode {
+func (c *CreatePersonalAccessToken) Code() Code {
 	return CreateAccessTokenCode
 }
 
@@ -39,7 +39,7 @@ func (c *CreatePersonalAccessToken) MarshalBinary() ([]byte, error) {
 
 type GetPersonalAccessTokens struct{}
 
-func (g *GetPersonalAccessTokens) Code() CommandCode {
+func (g *GetPersonalAccessTokens) Code() Code {
 	return GetAccessTokensCode
 }
 
@@ -51,7 +51,7 @@ type DeletePersonalAccessToken struct {
 	Name string `json:"Name"`
 }
 
-func (d *DeletePersonalAccessToken) Code() CommandCode {
+func (d *DeletePersonalAccessToken) Code() Code {
 	return DeleteAccessTokenCode
 }
 

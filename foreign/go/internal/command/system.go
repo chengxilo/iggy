@@ -23,7 +23,7 @@ type GetClient struct {
 	ClientID uint32
 }
 
-func (c *GetClient) Code() CommandCode {
+func (c *GetClient) Code() Code {
 	return GetClientCode
 }
 
@@ -35,7 +35,7 @@ func (c *GetClient) MarshalBinary() ([]byte, error) {
 
 type GetClients struct{}
 
-func (c *GetClients) Code() CommandCode {
+func (c *GetClients) Code() Code {
 	return GetClientsCode
 }
 
@@ -46,7 +46,7 @@ func (c *GetClients) MarshalBinary() ([]byte, error) {
 type GetClusterMetadata struct {
 }
 
-func (m *GetClusterMetadata) Code() CommandCode {
+func (m *GetClusterMetadata) Code() Code {
 	return GetClusterMetadataCode
 }
 
@@ -56,7 +56,7 @@ func (m *GetClusterMetadata) MarshalBinary() ([]byte, error) {
 
 type GetStats struct{}
 
-func (c *GetStats) Code() CommandCode {
+func (c *GetStats) Code() Code {
 	return GetStatsCode
 }
 
@@ -66,7 +66,7 @@ func (c *GetStats) MarshalBinary() ([]byte, error) {
 
 type Ping struct{}
 
-func (p *Ping) Code() CommandCode {
+func (p *Ping) Code() Code {
 	return PingCode
 }
 

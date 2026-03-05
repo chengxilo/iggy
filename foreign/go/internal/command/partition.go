@@ -29,7 +29,7 @@ type CreatePartitions struct {
 	PartitionsCount uint32            `json:"partitionsCount"`
 }
 
-func (c *CreatePartitions) Code() CommandCode {
+func (c *CreatePartitions) Code() Code {
 	return CreatePartitionsCode
 }
 
@@ -59,7 +59,7 @@ type DeletePartitions struct {
 	PartitionsCount uint32            `json:"partitionsCount"`
 }
 
-func (d *DeletePartitions) Code() CommandCode {
+func (d *DeletePartitions) Code() Code {
 	return DeletePartitionsCode
 }
 

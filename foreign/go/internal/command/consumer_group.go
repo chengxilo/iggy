@@ -29,7 +29,7 @@ type CreateConsumerGroup struct {
 	Name string
 }
 
-func (c *CreateConsumerGroup) Code() CommandCode {
+func (c *CreateConsumerGroup) Code() Code {
 	return CreateGroupCode
 }
 
@@ -56,7 +56,7 @@ type GetConsumerGroup struct {
 	GroupId iggcon.Identifier
 }
 
-func (g *GetConsumerGroup) Code() CommandCode {
+func (g *GetConsumerGroup) Code() Code {
 	return GetGroupCode
 }
 
@@ -69,7 +69,7 @@ type GetConsumerGroups struct {
 	TopicId  iggcon.Identifier
 }
 
-func (g *GetConsumerGroups) Code() CommandCode {
+func (g *GetConsumerGroups) Code() Code {
 	return GetGroupsCode
 }
 
@@ -82,7 +82,7 @@ type JoinConsumerGroup struct {
 	GroupId iggcon.Identifier
 }
 
-func (j *JoinConsumerGroup) Code() CommandCode {
+func (j *JoinConsumerGroup) Code() Code {
 	return JoinGroupCode
 }
 
@@ -95,7 +95,7 @@ type LeaveConsumerGroup struct {
 	GroupId iggcon.Identifier
 }
 
-func (l *LeaveConsumerGroup) Code() CommandCode {
+func (l *LeaveConsumerGroup) Code() Code {
 	return LeaveGroupCode
 }
 
@@ -108,7 +108,7 @@ type DeleteConsumerGroup struct {
 	GroupId iggcon.Identifier
 }
 
-func (d *DeleteConsumerGroup) Code() CommandCode {
+func (d *DeleteConsumerGroup) Code() Code {
 	return DeleteGroupCode
 }
 

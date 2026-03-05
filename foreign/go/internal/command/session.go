@@ -26,7 +26,7 @@ type LoginUser struct {
 	Password string `json:"password"`
 }
 
-func (lu *LoginUser) Code() CommandCode {
+func (lu *LoginUser) Code() Code {
 	return LoginUserCode
 }
 
@@ -73,7 +73,7 @@ type LoginWithPersonalAccessToken struct {
 	Token string `json:"token"`
 }
 
-func (lw *LoginWithPersonalAccessToken) Code() CommandCode {
+func (lw *LoginWithPersonalAccessToken) Code() Code {
 	return LoginWithAccessTokenCode
 }
 
@@ -87,7 +87,7 @@ func (lw *LoginWithPersonalAccessToken) MarshalBinary() ([]byte, error) {
 
 type LogoutUser struct{}
 
-func (lu *LogoutUser) Code() CommandCode {
+func (lu *LogoutUser) Code() Code {
 	return LogoutUserCode
 }
 

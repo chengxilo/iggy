@@ -246,7 +246,7 @@ func (c *IggyTcpClient) do(cmd command.Command) ([]byte, error) {
 	return c.sendAndFetchResponse(data, cmd.Code())
 }
 
-func (c *IggyTcpClient) sendAndFetchResponse(message []byte, command command.CommandCode) ([]byte, error) {
+func (c *IggyTcpClient) sendAndFetchResponse(message []byte, command command.Code) ([]byte, error) {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
 
@@ -281,7 +281,7 @@ func (c *IggyTcpClient) sendAndFetchResponse(message []byte, command command.Com
 	return buffer, nil
 }
 
-func createPayload(message []byte, command command.CommandCode) []byte {
+func createPayload(message []byte, command command.Code) []byte {
 	messageLength := len(message) + 4
 	messageBytes := make([]byte, RequestInitialBytesLength+messageLength)
 	binary.LittleEndian.PutUint32(messageBytes[:4], uint32(messageLength))

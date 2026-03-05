@@ -30,7 +30,7 @@ type CreateUser struct {
 	Permissions *iggcon.Permissions `json:"Permissions,omitempty"`
 }
 
-func (c *CreateUser) Code() CommandCode {
+func (c *CreateUser) Code() Code {
 	return CreateUserCode
 }
 
@@ -84,7 +84,7 @@ type GetUser struct {
 	Id iggcon.Identifier
 }
 
-func (c *GetUser) Code() CommandCode {
+func (c *GetUser) Code() Code {
 	return GetUserCode
 }
 
@@ -94,7 +94,7 @@ func (c *GetUser) MarshalBinary() ([]byte, error) {
 
 type GetUsers struct{}
 
-func (g *GetUsers) Code() CommandCode {
+func (g *GetUsers) Code() Code {
 	return GetUsersCode
 }
 
@@ -107,7 +107,7 @@ type UpdatePermissions struct {
 	Permissions *iggcon.Permissions `json:"Permissions,omitempty"`
 }
 
-func (u *UpdatePermissions) Code() CommandCode {
+func (u *UpdatePermissions) Code() Code {
 	return UpdatePermissionsCode
 }
 
@@ -151,7 +151,7 @@ type ChangePassword struct {
 	NewPassword     string            `json:"NewPassword"`
 }
 
-func (c *ChangePassword) Code() CommandCode {
+func (c *ChangePassword) Code() Code {
 	return ChangePasswordCode
 }
 
@@ -183,7 +183,7 @@ type DeleteUser struct {
 	Id iggcon.Identifier
 }
 
-func (d *DeleteUser) Code() CommandCode {
+func (d *DeleteUser) Code() Code {
 	return DeleteUserCode
 }
 

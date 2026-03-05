@@ -23,7 +23,7 @@ import (
 
 type Command interface {
 	// Code returns the command code associated with this command.
-	Code() CommandCode
+	Code() Code
 
 	encoding.BinaryMarshaler
 }

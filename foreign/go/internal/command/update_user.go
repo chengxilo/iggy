@@ -25,7 +25,7 @@ type UpdateUser struct {
 	Status   *iggcon.UserStatus `json:"userStatus"`
 }
 
-func (u *UpdateUser) Code() CommandCode {
+func (u *UpdateUser) Code() Code {
 	return UpdateUserCode
 }
 

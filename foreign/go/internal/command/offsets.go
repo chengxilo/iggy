@@ -31,7 +31,7 @@ type StoreConsumerOffsetRequest struct {
 	Offset      uint64            `json:"offset"`
 }
 
-func (s *StoreConsumerOffsetRequest) Code() CommandCode {
+func (s *StoreConsumerOffsetRequest) Code() Code {
 	return StoreOffsetCode
 }
 
@@ -76,7 +76,7 @@ type GetConsumerOffset struct {
 	PartitionId *uint32           `json:"partitionId"`
 }
 
-func (g *GetConsumerOffset) Code() CommandCode {
+func (g *GetConsumerOffset) Code() Code {
 	return GetOffsetCode
 }
 
@@ -120,7 +120,7 @@ type DeleteConsumerOffset struct {
 	PartitionId *uint32
 }
 
-func (d *DeleteConsumerOffset) Code() CommandCode {
+func (d *DeleteConsumerOffset) Code() Code {
 	return DeleteConsumerOffsetCode
 }
 

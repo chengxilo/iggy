@@ -28,7 +28,7 @@ type CreateStream struct {
 	Name string
 }
 
-func (request *CreateStream) Code() CommandCode {
+func (request *CreateStream) Code() Code {
 	return CreateStreamCode
 }
 
@@ -44,7 +44,7 @@ type GetStream struct {
 	StreamId iggcon.Identifier
 }
 
-func (g *GetStream) Code() CommandCode {
+func (g *GetStream) Code() Code {
 	return GetStreamCode
 }
 
@@ -54,7 +54,7 @@ func (g *GetStream) MarshalBinary() ([]byte, error) {
 
 type GetStreams struct{}
 
-func (g *GetStreams) Code() CommandCode {
+func (g *GetStreams) Code() Code {
 	return GetStreamsCode
 }
 
@@ -67,7 +67,7 @@ type UpdateStream struct {
 	Name     string            `json:"name"`
 }
 
-func (u *UpdateStream) Code() CommandCode {
+func (u *UpdateStream) Code() Code {
 	return UpdateStreamCode
 }
 
@@ -89,7 +89,7 @@ type DeleteStream struct {
 	StreamId iggcon.Identifier
 }
 
-func (d *DeleteStream) Code() CommandCode {
+func (d *DeleteStream) Code() Code {
 	return DeleteStreamCode
 }
 

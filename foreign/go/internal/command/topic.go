@@ -33,7 +33,7 @@ type CreateTopic struct {
 	ReplicationFactor    *uint8                      `json:"replicationFactor"`
 }
 
-func (t *CreateTopic) Code() CommandCode {
+func (t *CreateTopic) Code() Code {
 	return CreateTopicCode
 }
 
@@ -97,7 +97,7 @@ type GetTopic struct {
 	TopicId  iggcon.Identifier
 }
 
-func (g *GetTopic) Code() CommandCode {
+func (g *GetTopic) Code() Code {
 	return GetTopicCode
 }
 
@@ -109,7 +109,7 @@ type GetTopics struct {
 	StreamId iggcon.Identifier
 }
 
-func (g *GetTopics) Code() CommandCode {
+func (g *GetTopics) Code() Code {
 	return GetTopicsCode
 }
 
@@ -122,7 +122,7 @@ type DeleteTopic struct {
 	TopicId  iggcon.Identifier
 }
 
-func (d *DeleteTopic) Code() CommandCode {
+func (d *DeleteTopic) Code() Code {
 	return DeleteTopicCode
 }
 
@@ -140,7 +140,7 @@ type UpdateTopic struct {
 	Name                 string                      `json:"name"`
 }
 
-func (u *UpdateTopic) Code() CommandCode {
+func (u *UpdateTopic) Code() Code {
 	return UpdateTopicCode
 }
 
