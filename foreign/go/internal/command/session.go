@@ -15,9 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package iggcon
+package command
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+)
 
 type LoginUser struct {
 	Username string `json:"username"`
@@ -81,13 +83,6 @@ func (lw *LoginWithPersonalAccessToken) MarshalBinary() ([]byte, error) {
 	bytes[0] = byte(len(lw.Token))
 	copy(bytes[1:], lw.Token)
 	return bytes, nil
-}
-
-type IdentityInfo struct {
-	// Unique identifier (numeric) of the user.
-	UserId uint32 `json:"userId"`
-	// The optional tokens, used only by HTTP transport.
-	AccessToken *string `json:"accessToken"`
 }
 
 type LogoutUser struct{}
