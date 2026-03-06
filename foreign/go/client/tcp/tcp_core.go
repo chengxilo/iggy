@@ -100,7 +100,7 @@ type tcpClientReconnectionConfig struct {
 func defaultTcpClientReconnectionConfig() tcpClientReconnectionConfig {
 	return tcpClientReconnectionConfig{
 		enabled:          true,
-		maxRetries:       10,
+		maxRetries:       0, //infinity retry
 		interval:         2 * time.Second,
 		reestablishAfter: 0,
 	}
