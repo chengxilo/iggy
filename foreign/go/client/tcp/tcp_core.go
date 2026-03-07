@@ -338,6 +338,7 @@ func (c *IggyTcpClient) connect() error {
 	if err := retry.New(
 		retry.Attempts(attempts),
 		retry.Delay(interval),
+		retry.DelayType(retry.FixedDelay),
 	).Do(
 		func() error {
 			connection, err := net.Dial("tcp", c.currentServerAddress)
