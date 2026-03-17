@@ -352,7 +352,7 @@ func (c *IggyTcpClient) connect() error {
 		attempts = uint(c.config.reconnection.maxRetries)
 		interval = c.config.reconnection.interval
 	}
-	// TODO handle tls logic
+
 	var conn net.Conn
 	if err := retry.New(
 		retry.Attempts(attempts),
