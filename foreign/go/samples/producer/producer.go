@@ -18,6 +18,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -46,7 +47,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	_, err = cli.LoginUser("iggy", "iggy")
+	_, err = cli.LoginUser(context.Background(), "iggy", "iggy")
 	if err != nil {
 		panic("COULD NOT LOG IN")
 	}
@@ -62,8 +63,8 @@ func main() {
 
 func EnsureInfrastructureIsInitialized(cli iggcon.Client) error {
 	streamIdentifier, _ := iggcon.NewIdentifier(StreamId)
-	if _, streamErr := cli.GetStream(streamIdentifier); streamErr != nil {
-		_, streamErr = cli.CreateStream("Test Producer Stream")
+	if _, streamErr := cli.GetStream(context.Background(), streamIdentifier); streamErr != nil {
+		_, streamErr = cli.CreateStream(context.Background(), "Test Producer Stream")
 
 		fmt.Println(StreamId)
 
@@ -77,8 +78,9 @@ func EnsureInfrastructureIsInitialized(cli iggcon.Client) error {
 	fmt.Printf("Stream with ID: %d exists.\n", StreamId)
 
 	topicIdentifier, _ := iggcon.NewIdentifier(TopicId)
-	if _, topicErr := cli.GetTopic(streamIdentifier, topicIdentifier); topicErr != nil {
+	if _, topicErr := cli.GetTopic(context.Background(), streamIdentifier, topicIdentifier); topicErr != nil {
 		_, topicErr = cli.CreateTopic(
+			context.Background(),
 			streamIdentifier,
 			"Test Topic From Producer Sample",
 			12,
@@ -126,6 +128,7 @@ func PublishMessages(messageStream iggcon.Client) error {
 		streamIdentifier, _ := iggcon.NewIdentifier(StreamId)
 		topicIdentifier, _ := iggcon.NewIdentifier(TopicId)
 		err := messageStream.SendMessages(
+			context.Background(),
 			streamIdentifier,
 			topicIdentifier,
 			iggcon.PartitionId(Partition),

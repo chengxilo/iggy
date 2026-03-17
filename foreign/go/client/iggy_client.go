@@ -88,7 +88,7 @@ func NewIggyClient(options ...Option) (iggcon.Client, error) {
 				case <-ctx.Done():
 					return
 				case <-ticker.C:
-					if err := cli.Ping(); err != nil {
+					if err := cli.Ping(context.Background()); err != nil {
 						log.Printf("[WARN] heartbeat failed: %v", err)
 					}
 				}

@@ -18,6 +18,7 @@
 package tcp
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/binary"
@@ -256,17 +257,28 @@ func (c *IggyTcpClient) write(payload []byte) (int, error) {
 }
 
 // do sends the command to the Iggy server and returns the response.
-func (c *IggyTcpClient) do(cmd command.Command) ([]byte, error) {
+func (c *IggyTcpClient) do(ctx context.Context, cmd command.Command) ([]byte, error) {
 	data, err := cmd.MarshalBinary()
 	if err != nil {
 		return nil, err
 	}
-	return c.sendAndFetchResponse(data, cmd.Code())
+	return c.sendAndFetchResponse(ctx, data, cmd.Code())
 }
 
-func (c *IggyTcpClient) sendAndFetchResponse(message []byte, command command.Code) ([]byte, error) {
+func (c *IggyTcpClient) sendAndFetchResponse(ctx context.Context, message []byte, command command.Code) ([]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
+
+	if deadline, ok := ctx.Deadline(); ok {
+		if err := c.conn.SetDeadline(deadline); err != nil {
+			return nil, err
+		}
+		defer func() { _ = c.conn.SetDeadline(time.Time{}) }()
+	}
 
 	payload := createPayload(message, command)
 	if _, err := c.write(payload); err != nil {

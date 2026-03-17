@@ -18,6 +18,7 @@
 package main
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -47,7 +48,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	_, err = cli.LoginUser("iggy", "iggy")
+	_, err = cli.LoginUser(context.Background(), "iggy", "iggy")
 	if err != nil {
 		panic("COULD NOT LOG IN")
 	}
@@ -63,8 +64,8 @@ func main() {
 
 func EnsureInfrastructureIsInitialized(cli iggcon.Client) error {
 	streamIdentifier, _ := iggcon.NewIdentifier(DefaultStreamId)
-	if _, streamErr := cli.GetStream(streamIdentifier); streamErr != nil {
-		_, streamErr = cli.CreateStream("Test Producer Stream")
+	if _, streamErr := cli.GetStream(context.Background(), streamIdentifier); streamErr != nil {
+		_, streamErr = cli.CreateStream(context.Background(), "Test Producer Stream")
 
 		if streamErr != nil {
 			panic(streamErr)
@@ -76,8 +77,9 @@ func EnsureInfrastructureIsInitialized(cli iggcon.Client) error {
 	fmt.Printf("Stream with ID: %d exists.\n", DefaultStreamId)
 
 	topicIdentifier, _ := iggcon.NewIdentifier(TopicId)
-	if _, topicErr := cli.GetTopic(streamIdentifier, topicIdentifier); topicErr != nil {
+	if _, topicErr := cli.GetTopic(context.Background(), streamIdentifier, topicIdentifier); topicErr != nil {
 		_, topicErr = cli.CreateTopic(
+			context.Background(),
 			streamIdentifier,
 			"Test Topic From Producer Sample",
 			12,
@@ -107,6 +109,7 @@ func ConsumeMessages(cli iggcon.Client) error {
 		consumerIdentifier, _ := iggcon.NewIdentifier(ConsumerId)
 		partitionId := uint32(Partition)
 		messagesWrapper, err := cli.PollMessages(
+			context.Background(),
 			streamIdentifier,
 			topicIdentifier,
 			iggcon.NewSingleConsumer(consumerIdentifier),

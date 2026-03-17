@@ -18,13 +18,15 @@
 package tcp
 
 import (
+	"context"
+
 	binaryserialization "github.com/apache/iggy/foreign/go/binary_serialization"
 	iggcon "github.com/apache/iggy/foreign/go/contracts"
 	"github.com/apache/iggy/foreign/go/internal/command"
 )
 
-func (c *IggyTcpClient) GetStats() (*iggcon.Stats, error) {
-	buffer, err := c.do(&command.GetStats{})
+func (c *IggyTcpClient) GetStats(ctx context.Context) (*iggcon.Stats, error) {
+	buffer, err := c.do(ctx, &command.GetStats{})
 	if err != nil {
 		return nil, err
 	}
@@ -35,7 +37,7 @@ func (c *IggyTcpClient) GetStats() (*iggcon.Stats, error) {
 	return &stats.Stats, err
 }
 
-func (c *IggyTcpClient) Ping() error {
-	_, err := c.do(&command.Ping{})
+func (c *IggyTcpClient) Ping(ctx context.Context) error {
+	_, err := c.do(ctx, &command.Ping{})
 	return err
 }

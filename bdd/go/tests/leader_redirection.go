@@ -122,7 +122,7 @@ func serverTypeFromPort(port uint16) string {
 }
 
 func verifyLeaderInMetadata(client iggcon.Client) (*iggcon.ClusterNode, error) {
-	metadata, err := client.GetClusterMetadata()
+	metadata, err := client.GetClusterMetadata(context.Background())
 	if err != nil {
 		if isClusteringUnavailable(err) {
 			// Clustering not enabled, this is OK
@@ -155,7 +155,7 @@ func verifyClientConnection(client iggcon.Client, expectedPort uint16) (string, 
 	}
 
 	// Verify client can communicate
-	if err := client.Ping(); err != nil {
+	if err := client.Ping(context.Background()); err != nil {
 		return "", fmt.Errorf("client cannot ping server: %w", err)
 	}
 
@@ -324,7 +324,7 @@ func (s leaderSteps) whenAuthenticateRoot(ctx context.Context) error {
 		if !ok {
 			return fmt.Errorf("client %s should be created", name)
 		}
-		if _, err := cli.LoginUser(defaultRootUsername, defaultRootPassword); err != nil {
+		if _, err := cli.LoginUser(ctx, defaultRootUsername, defaultRootPassword); err != nil {
 			return err
 		}
 		// Small delay between multiple authentications to avoid race conditions
@@ -342,7 +342,7 @@ func (s leaderSteps) whenCreateStream(ctx context.Context, streamName string) er
 		return errors.New("client should be available")
 	}
 
-	stream, err := cli.CreateStream(streamName)
+	stream, err := cli.CreateStream(ctx, streamName)
 	if err != nil {
 		return err
 	}
@@ -437,7 +437,7 @@ func (s leaderSteps) thenConnectWithoutRedirection(ctx context.Context) error {
 	if !ok {
 		return errors.New("client should exist")
 	}
-	if err := cli.Ping(); err != nil {
+	if err := cli.Ping(ctx); err != nil {
 		return fmt.Errorf("client should be able to ping server: %v", err)
 	}
 	if c.TestState.RedirectionOccurred {
@@ -460,10 +460,10 @@ func (s leaderSteps) thenBothUseSameServer(ctx context.Context) error {
 	if a.GetConnectionInfo().ServerAddress != b.GetConnectionInfo().ServerAddress {
 		return errors.New("both clients should be connected to the same server")
 	}
-	if err := a.Ping(); err != nil {
+	if err := a.Ping(ctx); err != nil {
 		return errors.New("client A should be able to ping")
 	}
-	if err := b.Ping(); err != nil {
+	if err := b.Ping(ctx); err != nil {
 		return errors.New("client B should be able to ping")
 	}
 
