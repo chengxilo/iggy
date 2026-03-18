@@ -39,6 +39,8 @@ const (
 )
 
 func main() {
+	ctx := context.Background()
+
 	cli, err := client.NewIggyClient(
 		client.WithTcp(
 			tcp.WithServerAddress("127.0.0.1:8090"),
@@ -47,24 +49,24 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	_, err = cli.LoginUser(context.Background(), "iggy", "iggy")
+	_, err = cli.LoginUser(ctx, "iggy", "iggy")
 	if err != nil {
 		panic("COULD NOT LOG IN")
 	}
 
-	if err = EnsureInfrastructureIsInitialized(cli); err != nil {
+	if err = EnsureInfrastructureIsInitialized(ctx, cli); err != nil {
 		panic(err)
 	}
 
-	if err = PublishMessages(cli); err != nil {
+	if err = PublishMessages(ctx, cli); err != nil {
 		panic(err)
 	}
 }
 
-func EnsureInfrastructureIsInitialized(cli iggcon.Client) error {
+func EnsureInfrastructureIsInitialized(ctx context.Context, cli iggcon.Client) error {
 	streamIdentifier, _ := iggcon.NewIdentifier(StreamId)
-	if _, streamErr := cli.GetStream(context.Background(), streamIdentifier); streamErr != nil {
-		_, streamErr = cli.CreateStream(context.Background(), "Test Producer Stream")
+	if _, streamErr := cli.GetStream(ctx, streamIdentifier); streamErr != nil {
+		_, streamErr = cli.CreateStream(ctx, "Test Producer Stream")
 
 		fmt.Println(StreamId)
 
@@ -78,9 +80,9 @@ func EnsureInfrastructureIsInitialized(cli iggcon.Client) error {
 	fmt.Printf("Stream with ID: %d exists.\n", StreamId)
 
 	topicIdentifier, _ := iggcon.NewIdentifier(TopicId)
-	if _, topicErr := cli.GetTopic(context.Background(), streamIdentifier, topicIdentifier); topicErr != nil {
+	if _, topicErr := cli.GetTopic(ctx, streamIdentifier, topicIdentifier); topicErr != nil {
 		_, topicErr = cli.CreateTopic(
-			context.Background(),
+			ctx,
 			streamIdentifier,
 			"Test Topic From Producer Sample",
 			12,
@@ -101,7 +103,7 @@ func EnsureInfrastructureIsInitialized(cli iggcon.Client) error {
 	return nil
 }
 
-func PublishMessages(messageStream iggcon.Client) error {
+func PublishMessages(ctx context.Context, messageStream iggcon.Client) error {
 	fmt.Printf("Messages will be sent to stream '%d', topic '%d', partition '%d' with interval %d ms.\n", StreamId, TopicId, Partition, Interval)
 	messageGenerator := NewMessageGenerator()
 
@@ -128,7 +130,7 @@ func PublishMessages(messageStream iggcon.Client) error {
 		streamIdentifier, _ := iggcon.NewIdentifier(StreamId)
 		topicIdentifier, _ := iggcon.NewIdentifier(TopicId)
 		err := messageStream.SendMessages(
-			context.Background(),
+			ctx,
 			streamIdentifier,
 			topicIdentifier,
 			iggcon.PartitionId(Partition),
