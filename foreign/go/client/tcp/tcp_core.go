@@ -277,6 +277,10 @@ func (c *IggyTcpClient) sendAndFetchResponse(ctx context.Context, message []byte
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
 
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	if deadline, ok := ctx.Deadline(); ok {
 		if err := c.conn.SetDeadline(deadline); err != nil {
 			return nil, err
