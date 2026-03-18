@@ -55,7 +55,7 @@ func newTestClient(t *testing.T) (*IggyTcpClient, net.Conn) {
 
 func TestSendAndFetchResponse_NilContext(t *testing.T) {
 	c, _ := newTestClient(t)
-	_, err := c.sendAndFetchResponse(context.Background(), []byte{}, command.Code(0))
+	_, err := c.sendAndFetchResponse(nil, []byte{}, command.Code(0))
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
