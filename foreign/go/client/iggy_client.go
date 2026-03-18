@@ -96,9 +96,11 @@ func NewIggyClient(options ...Option) (iggcon.Client, error) {
 				case <-ctx.Done():
 					return
 				case <-ticker.C:
-					if err := cli.Ping(context.Background()); err != nil {
+					pingCtx, pingCancel := context.WithTimeout(ctx, heartbeatInterval/2)
+					if err := cli.Ping(pingCtx); err != nil {
 						log.Printf("[WARN] heartbeat failed: %v", err)
 					}
+					pingCancel()
 				}
 			}
 		}()
