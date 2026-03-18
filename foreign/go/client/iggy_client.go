@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/apache/iggy/foreign/go/client/tcp"
@@ -55,6 +56,7 @@ func WithTcp(tcpOpts ...tcp.Option) Option {
 type IggyClient struct {
 	iggcon.Client
 	cancel context.CancelFunc
+	wg     sync.WaitGroup
 }
 
 // NewIggyClient create the IggyClient instance.
@@ -79,8 +81,14 @@ func NewIggyClient(options ...Option) (iggcon.Client, error) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	heartbeatInterval := opts.heartbeatInterval
+	ic := &IggyClient{
+		Client: cli,
+		cancel: cancel,
+	}
 	if heartbeatInterval > 0 {
+		ic.wg.Add(1)
 		go func() {
+			defer ic.wg.Done()
 			ticker := time.NewTicker(heartbeatInterval)
 			defer ticker.Stop()
 			for {
@@ -95,13 +103,11 @@ func NewIggyClient(options ...Option) (iggcon.Client, error) {
 			}
 		}()
 	}
-	return &IggyClient{
-		Client: cli,
-		cancel: cancel,
-	}, nil
+	return ic, nil
 }
 
 func (ic *IggyClient) Close() error {
 	ic.cancel()
+	ic.wg.Wait()
 	return ic.Client.Close()
 }
