@@ -72,38 +72,38 @@ func TestReader_reads(t *testing.T) {
 	)
 
 	r := newReader(payload)
-	a := r.u8()
-	b := r.u32()
-	c := r.u64()
-	d := r.f32()
-	e := r.strN(len(wantStrN))
-	f := r.u32LenStr()
-	g := r.u8LenStr()
+	u8 := r.u8()
+	u32 := r.u32()
+	u64 := r.u64()
+	f32 := r.f32()
+	strN := r.strN(len(wantStrN))
+	u32LenStr := r.u32LenStr()
+	u8LenStr := r.u8LenStr()
 	rem := r.remaining()
 	if err := r.Err(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if a != wantU8 {
-		t.Errorf("u8: got %#x, want %#x", a, wantU8)
+	if u8 != wantU8 {
+		t.Errorf("u8: got %#x, want %#x", u8, wantU8)
 	}
-	if b != wantU32 {
-		t.Errorf("u32: got %#x, want %#x", b, wantU32)
+	if u32 != wantU32 {
+		t.Errorf("u32: got %#x, want %#x", u32, wantU32)
 	}
-	if c != wantU64 {
-		t.Errorf("u64: got %#x, want %#x", c, wantU64)
+	if u64 != wantU64 {
+		t.Errorf("u64: got %#x, want %#x", u64, wantU64)
 	}
-	if d != wantF32 {
-		t.Errorf("f32: got %v, want %v", d, wantF32)
+	if f32 != wantF32 {
+		t.Errorf("f32: got %v, want %v", f32, wantF32)
 	}
-	if e != wantStrN {
-		t.Errorf("strN: got %q, want %q", e, wantStrN)
+	if strN != wantStrN {
+		t.Errorf("strN: got %q, want %q", strN, wantStrN)
 	}
-	if f != wantU32LenStr {
-		t.Errorf("u32LenStr: got %q, want %q", f, wantU32LenStr)
+	if u32LenStr != wantU32LenStr {
+		t.Errorf("u32LenStr: got %q, want %q", u32LenStr, wantU32LenStr)
 	}
-	if g != wantU8LenStr {
-		t.Errorf("u8LenStr: got %q, want %q", g, wantU8LenStr)
+	if u8LenStr != wantU8LenStr {
+		t.Errorf("u8LenStr: got %q, want %q", u8LenStr, wantU8LenStr)
 	}
 	if rem != wantRem {
 		t.Errorf("remaining: got %d, want %d", rem, wantRem)
