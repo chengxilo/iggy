@@ -98,7 +98,6 @@ func (r *reader) f32() float32 {
 }
 
 // strN reads exactly n bytes as a string, copying them so the caller's string
-// does not retain a reference to the source buffer.
 // Use u8LenStr or u32LenStr instead if the data is length-prefixed:
 //
 //	[length: 1 byte][data: N bytes]   → u8LenStr
