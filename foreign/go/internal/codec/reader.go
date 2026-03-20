@@ -58,6 +58,19 @@ func (r *reader) u8() uint8 {
 	return v
 }
 
+func (r *reader) u16() uint16 {
+	if r.err != nil {
+		return 0
+	}
+	if r.pos+2 > len(r.p) {
+		r.overrun(2)
+		return 0
+	}
+	v := binary.LittleEndian.Uint16(r.p[r.pos : r.pos+2])
+	r.pos += 2
+	return v
+}
+
 func (r *reader) u32() uint32 {
 	if r.err != nil {
 		return 0

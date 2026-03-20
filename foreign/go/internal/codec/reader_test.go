@@ -28,6 +28,12 @@ import (
 
 // --- byte-construction helpers ---
 
+func u16le(v uint16) []byte {
+	b := make([]byte, 2)
+	binary.LittleEndian.PutUint16(b, v)
+	return b
+}
+
 func u32le(v uint32) []byte {
 	b := make([]byte, 4)
 	binary.LittleEndian.PutUint32(b, v)
@@ -51,6 +57,7 @@ func cat(slices ...[]byte) []byte {
 // TestReader_reads exercises every read method in sequence.
 func TestReader_reads(t *testing.T) {
 	const wantU8 uint8 = math.MaxUint8
+	const wantU16 uint16 = math.MaxUint16
 	const wantU32 uint32 = math.MaxUint32
 	const wantU64 uint64 = math.MaxUint64
 	const wantF32 float32 = math.Pi
@@ -62,6 +69,7 @@ func TestReader_reads(t *testing.T) {
 
 	payload := cat(
 		[]byte{wantU8},                                           // u8
+		u16le(wantU16),                                           // u16
 		u32le(wantU32),                                           // u32
 		u64le(wantU64),                                           // u64
 		u32le(math.Float32bits(wantF32)),                         // f32
@@ -73,6 +81,7 @@ func TestReader_reads(t *testing.T) {
 
 	r := newReader(payload)
 	u8 := r.u8()
+	u16 := r.u16()
 	u32 := r.u32()
 	u64 := r.u64()
 	f32 := r.f32()
@@ -86,6 +95,9 @@ func TestReader_reads(t *testing.T) {
 
 	if u8 != wantU8 {
 		t.Errorf("u8: got %#x, want %#x", u8, wantU8)
+	}
+	if u16 != wantU16 {
+		t.Errorf("u16: got %#x, want %#x", u16, wantU16)
 	}
 	if u32 != wantU32 {
 		t.Errorf("u32: got %#x, want %#x", u32, wantU32)
@@ -166,6 +178,7 @@ func TestReader_truncation(t *testing.T) {
 		read    func(*reader)
 	}{
 		{"u8", []byte{}, func(r *reader) { r.u8() }},
+		{"u16", []byte{0x01}, func(r *reader) { r.u16() }},                                           // 1 byte, need 2
 		{"u32", []byte{0x01, 0x02, 0x03}, func(r *reader) { r.u32() }},                               // 3 bytes, need 4
 		{"u64", []byte{0x01, 0x02, 0x03, 0x04}, func(r *reader) { r.u64() }},                         // 4 bytes, need 8
 		{"f32", []byte{0x01, 0x02, 0x03}, func(r *reader) { r.f32() }},                               // 3 bytes, need 4
@@ -201,6 +214,11 @@ func TestReader_overrun_error_location(t *testing.T) {
 		{"u8", func(r *reader) (string, int) {
 			_, file, line, _ := runtime.Caller(0)
 			r.u8()
+			return file, line + 1
+		}},
+		{"u16", func(r *reader) (string, int) {
+			_, file, line, _ := runtime.Caller(0)
+			r.u16()
 			return file, line + 1
 		}},
 		{"u32", func(r *reader) (string, int) {
