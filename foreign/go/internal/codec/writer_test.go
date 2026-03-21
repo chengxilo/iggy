@@ -23,7 +23,7 @@ import (
 )
 
 // TestWriter_roundTrip writes every method in sequence then reads back with
-// reader and verifies the values survive the round-trip.
+// Reader and verifies the values survive the round-trip.
 func TestWriter_roundTrip(t *testing.T) {
 	const wantU8 uint8 = math.MaxUint8
 	const wantU16 uint16 = math.MaxUint16
@@ -35,66 +35,66 @@ func TestWriter_roundTrip(t *testing.T) {
 	wantU32LenStr := "uint32"
 	wantU8LenStr := "uint8"
 
-	w := newWriter()
-	w.u8(wantU8)
-	w.u16(wantU16)
-	w.u32(wantU32)
-	w.u64(wantU64)
-	w.f32(wantF32)
-	w.strN(wantStrN)
-	w.u32LenStr(wantU32LenStr)
-	w.u8LenStr(wantU8LenStr)
+	w := NewWriter()
+	w.U8(wantU8)
+	w.U16(wantU16)
+	w.U32(wantU32)
+	w.U64(wantU64)
+	w.F32(wantF32)
+	w.StrN(wantStrN)
+	w.U32LenStr(wantU32LenStr)
+	w.U8LenStr(wantU8LenStr)
 
-	r := newReader(w.bytes())
-	u8 := r.u8()
-	u16 := r.u16()
-	u32 := r.u32()
-	u64 := r.u64()
-	f32 := r.f32()
-	strN := r.strN(len(wantStrN))
-	u32LenStr := r.u32LenStr()
-	u8LenStr := r.u8LenStr()
+	r := NewReader(w.Bytes())
+	u8 := r.U8()
+	u16 := r.U16()
+	u32 := r.U32()
+	u64 := r.U64()
+	f32 := r.F32()
+	strN := r.StrN(len(wantStrN))
+	u32LenStr := r.U32LenStr()
+	u8LenStr := r.U8LenStr()
 	if err := r.Err(); err != nil {
 		t.Fatalf("unexpected read error: %v", err)
 	}
-	if r.remaining() != 0 {
-		t.Errorf("unexpected trailing bytes: %d", r.remaining())
+	if r.Remaining() != 0 {
+		t.Errorf("unexpected trailing bytes: %d", r.Remaining())
 	}
 
 	if u8 != wantU8 {
-		t.Errorf("u8: got %#x, want %#x", u8, wantU8)
+		t.Errorf("U8: got %#x, want %#x", u8, wantU8)
 	}
 	if u16 != wantU16 {
-		t.Errorf("u16: got %#x, want %#x", u16, wantU16)
+		t.Errorf("U16: got %#x, want %#x", u16, wantU16)
 	}
 	if u32 != wantU32 {
-		t.Errorf("u32: got %#x, want %#x", u32, wantU32)
+		t.Errorf("U32: got %#x, want %#x", u32, wantU32)
 	}
 	if u64 != wantU64 {
-		t.Errorf("u64: got %#x, want %#x", u64, wantU64)
+		t.Errorf("U64: got %#x, want %#x", u64, wantU64)
 	}
 	if f32 != wantF32 {
-		t.Errorf("f32: got %v, want %v", f32, wantF32)
+		t.Errorf("F32: got %v, want %v", f32, wantF32)
 	}
 	if strN != wantStrN {
-		t.Errorf("strN: got %q, want %q", strN, wantStrN)
+		t.Errorf("StrN: got %q, want %q", strN, wantStrN)
 	}
 	if u32LenStr != wantU32LenStr {
-		t.Errorf("u32LenStr: got %q, want %q", u32LenStr, wantU32LenStr)
+		t.Errorf("U32LenStr: got %q, want %q", u32LenStr, wantU32LenStr)
 	}
 	if u8LenStr != wantU8LenStr {
-		t.Errorf("u8LenStr: got %q, want %q", u8LenStr, wantU8LenStr)
+		t.Errorf("U8LenStr: got %q, want %q", u8LenStr, wantU8LenStr)
 	}
 }
 
-// TestWriterCap_noAlloc verifies that newWriterCap avoids
+// TestWriterCap_noAlloc verifies that NewWriterCap avoids
 // reallocations when the provided capacity is sufficient.
 func TestWriterCap_noAlloc(t *testing.T) {
-	const n = 4 + 1 + len("name") // u32 + u8LenStr("name")
-	w := newWriterCap(n)
+	const n = 4 + 1 + len("name") // U32 + U8LenStr("name")
+	w := NewWriterCap(n)
 	capBefore := cap(w.p)
-	w.u32(42)
-	w.u8LenStr("name")
+	w.U32(42)
+	w.U8LenStr("name")
 	if cap(w.p) != capBefore {
 		t.Errorf("reallocation occurred: cap before=%d, after=%d", capBefore, cap(w.p))
 	}

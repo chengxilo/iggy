@@ -24,28 +24,28 @@ import (
 	"runtime"
 )
 
-// reader is a cursor over a byte slice. The first out-of-bounds read sets err;
+// Reader is a cursor over a byte slice. The first out-of-bounds read sets err;
 // all subsequent reads are no-ops. Call Err() once after all reads to check.
-type reader struct {
+type Reader struct {
 	p   []byte
 	pos int
 	err error
 }
 
-func newReader(p []byte) *reader {
-	return &reader{p: p}
+func NewReader(p []byte) *Reader {
+	return &Reader{p: p}
 }
 
 // overrun sets r.err to a descriptive error message including the caller's
 // file and line number.
-func (r *reader) overrun(need int) {
+func (r *Reader) overrun(need int) {
 	_, file, line, _ := runtime.Caller(2)
 	r.err = fmt.Errorf(
 		"reader: need %d bytes at offset %d, only %d remaining (%s:%d)",
 		need, r.pos, len(r.p)-r.pos, file, line)
 }
 
-func (r *reader) u8() uint8 {
+func (r *Reader) U8() uint8 {
 	if r.err != nil {
 		return 0
 	}
@@ -58,7 +58,7 @@ func (r *reader) u8() uint8 {
 	return v
 }
 
-func (r *reader) u16() uint16 {
+func (r *Reader) U16() uint16 {
 	if r.err != nil {
 		return 0
 	}
@@ -71,7 +71,7 @@ func (r *reader) u16() uint16 {
 	return v
 }
 
-func (r *reader) u32() uint32 {
+func (r *Reader) U32() uint32 {
 	if r.err != nil {
 		return 0
 	}
@@ -84,7 +84,7 @@ func (r *reader) u32() uint32 {
 	return v
 }
 
-func (r *reader) u64() uint64 {
+func (r *Reader) U64() uint64 {
 	if r.err != nil {
 		return 0
 	}
@@ -97,7 +97,7 @@ func (r *reader) u64() uint64 {
 	return v
 }
 
-func (r *reader) f32() float32 {
+func (r *Reader) F32() float32 {
 	if r.err != nil {
 		return 0
 	}
@@ -110,12 +110,12 @@ func (r *reader) f32() float32 {
 	return v
 }
 
-// strN reads exactly n bytes as a string, copying them so the caller's string
-// Use u8LenStr or u32LenStr instead if the data is length-prefixed:
+// StrN reads exactly n bytes as a string, copying them so the caller's string
+// Use U8LenStr or U32LenStr instead if the data is length-prefixed:
 //
-//	[length: 1 byte][data: N bytes]   → u8LenStr
-//	[length: 4 bytes][data: N bytes]  → u32LenStr
-func (r *reader) strN(n int) string {
+//	[length: 1 byte][data: N bytes]   → U8LenStr
+//	[length: 4 bytes][data: N bytes]  → U32LenStr
+func (r *Reader) StrN(n int) string {
 	if r.err != nil {
 		return ""
 	}
@@ -128,9 +128,9 @@ func (r *reader) strN(n int) string {
 	return v
 }
 
-// u32LenStr reads a length-prefixed string where the length is a 4-byte
+// U32LenStr reads a length-prefixed string where the length is a 4-byte
 // little-endian unsigned integer.
-func (r *reader) u32LenStr() string {
+func (r *Reader) U32LenStr() string {
 	if r.err != nil {
 		return ""
 	}
@@ -149,8 +149,8 @@ func (r *reader) u32LenStr() string {
 	return v
 }
 
-// u8LenStr reads a length-prefixed string where the length is a single byte.
-func (r *reader) u8LenStr() string {
+// U8LenStr reads a length-prefixed string where the length is a single byte.
+func (r *Reader) U8LenStr() string {
 	if r.err != nil {
 		return ""
 	}
@@ -169,10 +169,10 @@ func (r *reader) u8LenStr() string {
 	return v
 }
 
-// remaining returns the number of unread bytes
-func (r *reader) remaining() int {
+// Remaining returns the number of unread bytes.
+func (r *Reader) Remaining() int {
 	return len(r.p) - r.pos
 }
 
 // Err returns the first error encountered during reading, or nil.
-func (r *reader) Err() error { return r.err }
+func (r *Reader) Err() error { return r.err }
