@@ -63,7 +63,7 @@ func TestReader_reads(t *testing.T) {
 	const wantF32 float32 = math.Pi
 	const wantRem = 1
 
-	wantStrN := "str"
+	wantStr := "str"
 	wantU32LenStr := "uint32"
 	wantU8LenStr := "uint8"
 
@@ -73,7 +73,7 @@ func TestReader_reads(t *testing.T) {
 		u32le(wantU32),                                           // U32
 		u64le(wantU64),                                           // U64
 		u32le(math.Float32bits(wantF32)),                         // F32
-		[]byte(wantStrN),                                         // StrN(len(wantStrN))
+		[]byte(wantStr),                                          // Str(len(wantStr))
 		u32le(uint32(len(wantU32LenStr))), []byte(wantU32LenStr), // U32LenStr
 		[]byte{uint8(len(wantU8LenStr))}, []byte(wantU8LenStr), // U8LenStr
 		[]byte{0xFF}, // wantRem trailing bytes for Remaining()
@@ -85,7 +85,7 @@ func TestReader_reads(t *testing.T) {
 	u32 := r.U32()
 	u64 := r.U64()
 	f32 := r.F32()
-	strN := r.StrN(len(wantStrN))
+	str := r.Str(len(wantStr))
 	u32LenStr := r.U32LenStr()
 	u8LenStr := r.U8LenStr()
 	rem := r.Remaining()
@@ -108,8 +108,8 @@ func TestReader_reads(t *testing.T) {
 	if f32 != wantF32 {
 		t.Errorf("F32: got %v, want %v", f32, wantF32)
 	}
-	if strN != wantStrN {
-		t.Errorf("StrN: got %q, want %q", strN, wantStrN)
+	if str != wantStr {
+		t.Errorf("Str: got %q, want %q", str, wantStr)
 	}
 	if u32LenStr != wantU32LenStr {
 		t.Errorf("U32LenStr: got %q, want %q", u32LenStr, wantU32LenStr)
@@ -133,9 +133,9 @@ func TestReader_str_copies(t *testing.T) {
 		read    func(*Reader) string
 	}{
 		{
-			name:    "StrN",
+			name:    "Str",
 			payload: func() []byte { return []byte(wantStr) },
-			read:    func(r *Reader) string { return r.StrN(len(wantStr)) },
+			read:    func(r *Reader) string { return r.Str(len(wantStr)) },
 		},
 		{
 			name: "U8LenStr",
@@ -182,7 +182,7 @@ func TestReader_truncation(t *testing.T) {
 		{"U32", []byte{0x01, 0x02, 0x03}, func(r *Reader) { r.U32() }},                               // 3 bytes, need 4
 		{"U64", []byte{0x01, 0x02, 0x03, 0x04}, func(r *Reader) { r.U64() }},                         // 4 bytes, need 8
 		{"F32", []byte{0x01, 0x02, 0x03}, func(r *Reader) { r.F32() }},                               // 3 bytes, need 4
-		{"StrN", []byte("hi"), func(r *Reader) { r.StrN(5) }},                                        // claims 5, has 2
+		{"Str", []byte("hi"), func(r *Reader) { r.Str(5) }},                                          // claims 5, has 2
 		{"U32LenStr/short-len-prefix", []byte{0x05, 0x00}, func(r *Reader) { r.U32LenStr() }},        // len prefix needs 4 bytes, got 2
 		{"U32LenStr/short-body", cat(u32le(10), []byte("short")), func(r *Reader) { r.U32LenStr() }}, // claims 10, has 5
 		{"U8LenStr/short-len-prefix", []byte{}, func(r *Reader) { r.U8LenStr() }},                    // len prefix needs 1 byte, got 0
@@ -236,9 +236,9 @@ func TestReader_overrun_error_location(t *testing.T) {
 			r.F32()
 			return file, line + 1
 		}},
-		{"StrN", func(r *Reader) (string, int) {
+		{"Str", func(r *Reader) (string, int) {
 			_, file, line, _ := runtime.Caller(0)
-			r.StrN(1)
+			r.Str(1)
 			return file, line + 1
 		}},
 		{"U32LenStr", func(r *Reader) (string, int) {

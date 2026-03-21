@@ -60,9 +60,9 @@ func (w *Writer) F32(v float32) {
 	w.p = binary.LittleEndian.AppendUint32(w.p, math.Float32bits(v))
 }
 
-// StrN writes a string with no length prefix. Use U8LenStr or U32LenStr
+// Str writes a string with no length prefix. Use U8LenStr or U32LenStr
 // instead if the reader expects a length prefix.
-func (w *Writer) StrN(v string) {
+func (w *Writer) Str(v string) {
 	w.p = append(w.p, v...)
 }
 
@@ -70,13 +70,13 @@ func (w *Writer) StrN(v string) {
 // little-endian unsigned integer.
 func (w *Writer) U32LenStr(v string) {
 	w.p = binary.LittleEndian.AppendUint32(w.p, uint32(len(v)))
-	w.p = append(w.p, v...)
+	w.Str(v)
 }
 
 // U8LenStr writes a length-prefixed string where the length is a single byte.
 func (w *Writer) U8LenStr(v string) {
 	w.p = append(w.p, uint8(len(v)))
-	w.p = append(w.p, v...)
+	w.Str(v)
 }
 
 // Bytes returns the accumulated buffer directly. The caller must not retain

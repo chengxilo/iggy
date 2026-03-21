@@ -31,7 +31,7 @@ func TestWriter_roundTrip(t *testing.T) {
 	const wantU64 uint64 = math.MaxUint64
 	const wantF32 float32 = math.Pi
 
-	wantStrN := "str"
+	wantStr := "str"
 	wantU32LenStr := "uint32"
 	wantU8LenStr := "uint8"
 
@@ -41,7 +41,7 @@ func TestWriter_roundTrip(t *testing.T) {
 	w.U32(wantU32)
 	w.U64(wantU64)
 	w.F32(wantF32)
-	w.StrN(wantStrN)
+	w.Str(wantStr)
 	w.U32LenStr(wantU32LenStr)
 	w.U8LenStr(wantU8LenStr)
 
@@ -51,7 +51,7 @@ func TestWriter_roundTrip(t *testing.T) {
 	u32 := r.U32()
 	u64 := r.U64()
 	f32 := r.F32()
-	strN := r.StrN(len(wantStrN))
+	str := r.Str(len(wantStr))
 	u32LenStr := r.U32LenStr()
 	u8LenStr := r.U8LenStr()
 	if err := r.Err(); err != nil {
@@ -76,8 +76,8 @@ func TestWriter_roundTrip(t *testing.T) {
 	if f32 != wantF32 {
 		t.Errorf("F32: got %v, want %v", f32, wantF32)
 	}
-	if strN != wantStrN {
-		t.Errorf("StrN: got %q, want %q", strN, wantStrN)
+	if str != wantStr {
+		t.Errorf("Str: got %q, want %q", str, wantStr)
 	}
 	if u32LenStr != wantU32LenStr {
 		t.Errorf("U32LenStr: got %q, want %q", u32LenStr, wantU32LenStr)

@@ -110,12 +110,19 @@ func (r *Reader) F32() float32 {
 	return v
 }
 
-// StrN reads exactly n bytes as a string, copying them so the caller's string
-// Use U8LenStr or U32LenStr instead if the data is length-prefixed:
+// strN reads exactly n bytes as a string.
+func (r *Reader) strN(n int) string {
+	v := string(r.p[r.pos : r.pos+n])
+	r.pos += n
+	return v
+}
+
+// Str reads exactly n bytes as a string. Use U8LenStr or U32LenStr instead
+// if the data is length-prefixed:
 //
 //	[length: 1 byte][data: N bytes]   → U8LenStr
 //	[length: 4 bytes][data: N bytes]  → U32LenStr
-func (r *Reader) StrN(n int) string {
+func (r *Reader) Str(n int) string {
 	if r.err != nil {
 		return ""
 	}
@@ -123,9 +130,7 @@ func (r *Reader) StrN(n int) string {
 		r.overrun(n)
 		return ""
 	}
-	v := string(r.p[r.pos : r.pos+n])
-	r.pos += n
-	return v
+	return r.strN(n)
 }
 
 // U32LenStr reads a length-prefixed string where the length is a 4-byte
@@ -144,9 +149,7 @@ func (r *Reader) U32LenStr() string {
 		r.overrun(n)
 		return ""
 	}
-	v := string(r.p[r.pos : r.pos+n])
-	r.pos += n
-	return v
+	return r.strN(n)
 }
 
 // U8LenStr reads a length-prefixed string where the length is a single byte.
@@ -164,9 +167,7 @@ func (r *Reader) U8LenStr() string {
 		r.overrun(n)
 		return ""
 	}
-	v := string(r.p[r.pos : r.pos+n])
-	r.pos += n
-	return v
+	return r.strN(n)
 }
 
 // Remaining returns the number of unread bytes.
