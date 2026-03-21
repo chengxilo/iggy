@@ -202,6 +202,15 @@ func TestReader_truncation(t *testing.T) {
 	}
 }
 
+// TestReader_Str_negative verifies that a negative n sets an error containing
+// the call site location.
+func TestReader_Str_negative(t *testing.T) {
+	r := NewReader([]byte("hi"))
+	_, file, line, _ := runtime.Caller(0)
+	r.Str(-1)
+	checkLoc(t, r.Err(), file, line+1)
+}
+
 // TestReader_overrun_error_location verifies that the error message contains
 // the file and line of the call site that triggered the overrun, for every
 // public read method.
