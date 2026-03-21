@@ -19,6 +19,7 @@ package codec
 
 import (
 	"math"
+	"strings"
 	"testing"
 )
 
@@ -85,6 +86,17 @@ func TestWriter_roundTrip(t *testing.T) {
 	if u8LenStr != wantU8LenStr {
 		t.Errorf("U8LenStr: got %q, want %q", u8LenStr, wantU8LenStr)
 	}
+}
+
+// TestWriter_U8LenStr_overflow verifies that U8LenStr panics for strings
+// longer than 255 bytes.
+func TestWriter_U8LenStr_overflow(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic for string > 255 bytes, got none")
+		}
+	}()
+	NewWriter().U8LenStr(strings.Repeat("a", math.MaxUint8+1))
 }
 
 // TestWriterCap_noAlloc verifies that NewWriterCap avoids

@@ -19,6 +19,7 @@ package codec
 
 import (
 	"encoding/binary"
+	"fmt"
 	"math"
 )
 
@@ -74,7 +75,11 @@ func (w *Writer) U32LenStr(v string) {
 }
 
 // U8LenStr writes a length-prefixed string where the length is a single byte.
+// It panics if len(v) exceeds 255.
 func (w *Writer) U8LenStr(v string) {
+	if len(v) > math.MaxUint8 {
+		panic(fmt.Sprintf("string length %d exceeds 255", len(v)))
+	}
 	w.p = append(w.p, uint8(len(v)))
 	w.Str(v)
 }
