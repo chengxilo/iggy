@@ -122,7 +122,7 @@ func TestReader_reads(t *testing.T) {
 	}
 }
 
-// TestReader_str_copies verifies that StrN, U8LenStr, and U32LenStr all copy
+// TestReader_str_copies verifies that Str, U8LenStr, and U32LenStr all copy
 // the source buffer so the returned string is not affected by later mutations.
 func TestReader_str_copies(t *testing.T) {
 	const wantStr = "hello"
