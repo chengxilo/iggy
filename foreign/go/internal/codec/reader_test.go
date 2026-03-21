@@ -207,46 +207,56 @@ func TestReader_truncation(t *testing.T) {
 // public read method.
 func TestReader_overrun_error_location(t *testing.T) {
 	cases := []struct {
-		name string
-		// fn triggers the overrun and returns the expected file:line of the call.
-		fn func(r *Reader) (wantFile string, wantLine int)
+		name    string
+		payload []byte
+		fn      func(r *Reader) (wantFile string, wantLine int)
 	}{
-		{"U8", func(r *Reader) (string, int) {
+		{"U8", []byte{}, func(r *Reader) (string, int) {
 			_, file, line, _ := runtime.Caller(0)
 			r.U8()
 			return file, line + 1
 		}},
-		{"U16", func(r *Reader) (string, int) {
+		{"U16", []byte{}, func(r *Reader) (string, int) {
 			_, file, line, _ := runtime.Caller(0)
 			r.U16()
 			return file, line + 1
 		}},
-		{"U32", func(r *Reader) (string, int) {
+		{"U32", []byte{}, func(r *Reader) (string, int) {
 			_, file, line, _ := runtime.Caller(0)
 			r.U32()
 			return file, line + 1
 		}},
-		{"U64", func(r *Reader) (string, int) {
+		{"U64", []byte{}, func(r *Reader) (string, int) {
 			_, file, line, _ := runtime.Caller(0)
 			r.U64()
 			return file, line + 1
 		}},
-		{"F32", func(r *Reader) (string, int) {
+		{"F32", []byte{}, func(r *Reader) (string, int) {
 			_, file, line, _ := runtime.Caller(0)
 			r.F32()
 			return file, line + 1
 		}},
-		{"Str", func(r *Reader) (string, int) {
+		{"Str", []byte{}, func(r *Reader) (string, int) {
 			_, file, line, _ := runtime.Caller(0)
 			r.Str(1)
 			return file, line + 1
 		}},
-		{"U32LenStr", func(r *Reader) (string, int) {
+		{"U32LenStr/prefix", []byte{}, func(r *Reader) (string, int) {
 			_, file, line, _ := runtime.Caller(0)
 			r.U32LenStr()
 			return file, line + 1
 		}},
-		{"U8LenStr", func(r *Reader) (string, int) {
+		{"U32LenStr/body", cat(u32le(100), []byte("short")), func(r *Reader) (string, int) {
+			_, file, line, _ := runtime.Caller(0)
+			r.U32LenStr()
+			return file, line + 1
+		}},
+		{"U8LenStr/prefix", []byte{}, func(r *Reader) (string, int) {
+			_, file, line, _ := runtime.Caller(0)
+			r.U8LenStr()
+			return file, line + 1
+		}},
+		{"U8LenStr/body", cat([]byte{100}, []byte("short")), func(r *Reader) (string, int) {
 			_, file, line, _ := runtime.Caller(0)
 			r.U8LenStr()
 			return file, line + 1
@@ -255,7 +265,7 @@ func TestReader_overrun_error_location(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			r := NewReader([]byte{})
+			r := NewReader(tc.payload)
 			wantFile, wantLine := tc.fn(r)
 			checkLoc(t, r.Err(), wantFile, wantLine)
 		})
