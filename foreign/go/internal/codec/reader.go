@@ -45,13 +45,6 @@ func (r *Reader) overrun(need int) {
 		need, r.pos, len(r.p)-r.pos, file, line)
 }
 
-// invalidArg sets r.err to an invalid argument error including the caller's
-// file and line number.
-func (r *Reader) invalidArg(msg string) {
-	_, file, line, _ := runtime.Caller(2)
-	r.err = fmt.Errorf("reader: invalid argument: %s (%s:%d)", msg, file, line)
-}
-
 func (r *Reader) U8() uint8 {
 	if r.err != nil {
 		return 0
@@ -131,10 +124,6 @@ func (r *Reader) strN(n int) string {
 //	[length: 4 bytes][data: N bytes]  → U32LenStr
 func (r *Reader) Str(n int) string {
 	if r.err != nil {
-		return ""
-	}
-	if n < 0 {
-		r.invalidArg(fmt.Sprintf("n=%d", n))
 		return ""
 	}
 	if r.pos+n > len(r.p) {
