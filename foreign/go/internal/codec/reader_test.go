@@ -307,7 +307,8 @@ func TestReader_overrun_error_location(t *testing.T) {
 			_, file, line, _ := runtime.Caller(0)
 			r.Raw(1)
 			return file, line + 1
-		}}, {"Obj", []byte{1}, func(r *Reader) (string, int) {
+		}},
+		{"Obj", []byte{1}, func(r *Reader) (string, int) {
 			var p testPoint
 			_, file, line, _ := runtime.Caller(0)
 			r.Obj(2, &p)
