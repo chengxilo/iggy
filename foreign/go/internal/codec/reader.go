@@ -18,6 +18,7 @@
 package codec
 
 import (
+	"encoding"
 	"encoding/binary"
 	"fmt"
 	"math"
@@ -110,15 +111,35 @@ func (r *Reader) F32() float32 {
 	return v
 }
 
-// strN reads exactly n bytes as a string.
-func (r *Reader) strN(n int) string {
+// str reads exactly n bytes and returns a copy as a string.
+func (r *Reader) str(n int) string {
 	v := string(r.p[r.pos : r.pos+n])
 	r.pos += n
 	return v
 }
 
-// Str reads exactly n bytes as a string. Use U8LenStr or U32LenStr instead
-// if the data is length-prefixed:
+// raw reads exactly n bytes and returns a copy.
+func (r *Reader) raw(n int) []byte {
+	v := make([]byte, n)
+	copy(v, r.p[r.pos:r.pos+n])
+	r.pos += n
+	return v
+}
+
+// Raw reads exactly n bytes and returns a copy.
+func (r *Reader) Raw(n int) []byte {
+	if r.err != nil {
+		return nil
+	}
+	if r.pos+n > len(r.p) {
+		r.overrun(n)
+		return nil
+	}
+	return r.raw(n)
+}
+
+// Str reads exactly n bytes and returns a copy as a string. Use U8LenStr or
+// U32LenStr instead if the data is length-prefixed:
 //
 //	[length: 1 byte][data: N bytes]   → U8LenStr
 //	[length: 4 bytes][data: N bytes]  → U32LenStr
@@ -130,7 +151,7 @@ func (r *Reader) Str(n int) string {
 		r.overrun(n)
 		return ""
 	}
-	return r.strN(n)
+	return r.str(n)
 }
 
 // U32LenStr reads a length-prefixed string where the length is a 4-byte
@@ -149,7 +170,7 @@ func (r *Reader) U32LenStr() string {
 		r.overrun(n)
 		return ""
 	}
-	return r.strN(n)
+	return r.str(n)
 }
 
 // U8LenStr reads a length-prefixed string where the length is a single byte.
@@ -167,7 +188,24 @@ func (r *Reader) U8LenStr() string {
 		r.overrun(n)
 		return ""
 	}
-	return r.strN(n)
+	return r.str(n)
+}
+
+// Obj reads n bytes and decodes them into v.
+func (r *Reader) Obj(n int, v encoding.BinaryUnmarshaler) {
+	if r.err != nil {
+		return
+	}
+	if r.pos+n > len(r.p) {
+		r.overrun(n)
+		return
+	}
+	err := v.UnmarshalBinary(r.raw(n))
+	if err != nil {
+		_, file, line, _ := runtime.Caller(1)
+		r.err = fmt.Errorf("%w (%s:%d)", err, file, line)
+		return
+	}
 }
 
 // Remaining returns the number of unread bytes.
