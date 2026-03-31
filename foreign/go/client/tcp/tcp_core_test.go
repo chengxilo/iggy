@@ -19,6 +19,7 @@ package tcp
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"net"
 	"strings"
@@ -26,6 +27,7 @@ import (
 	"time"
 
 	iggcon "github.com/apache/iggy/foreign/go/contracts"
+	ierror "github.com/apache/iggy/foreign/go/errors"
 	"github.com/apache/iggy/foreign/go/internal/command"
 )
 
@@ -118,12 +120,8 @@ func TestSendAndFetchResponse_DeadlineTimeout(t *testing.T) {
 		t.Fatal("expected timeout error, got nil")
 	}
 
-	var netErr net.Error
-	if !errors.As(err, &netErr) {
-		t.Fatalf("expected a net.Error, got %T: %v", err, err)
-	}
-	if !netErr.Timeout() {
-		t.Errorf("expected timeout error, got %v", err)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("got %v, want context.DeadlineExceeded", err)
 	}
 	// After a timeout, the connection should be invalidated.
 	if c.state != iggcon.StateDisconnected {
@@ -148,8 +146,92 @@ func TestSendAndFetchResponse_CancelDuringIO(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("got %v, want context.Canceled", err)
+	}
 	// Connection should be invalidated after the I/O error.
 	if c.state != iggcon.StateDisconnected {
 		t.Errorf("expected state %v, got %v", iggcon.StateDisconnected, c.state)
+	}
+}
+
+// serverRespond is a test helper that reads the full request from the pipe
+// and writes back a response with the given status code and payload.
+func serverRespond(t *testing.T, serverConn net.Conn, status uint32, payload []byte) {
+	t.Helper()
+
+	var lengthBuf [RequestInitialBytesLength]byte
+	if _, err := serverConn.Read(lengthBuf[:]); err != nil {
+		t.Errorf("server: read request length: %v", err)
+		return
+	}
+	reqLen := int(binary.LittleEndian.Uint32(lengthBuf[:]))
+	discard := make([]byte, reqLen)
+	if _, err := serverConn.Read(discard); err != nil {
+		t.Errorf("server: read request body: %v", err)
+		return
+	}
+
+	resp := make([]byte, 8+len(payload))
+	binary.LittleEndian.PutUint32(resp[0:4], status)
+	binary.LittleEndian.PutUint32(resp[4:8], uint32(len(payload)))
+	copy(resp[8:], payload)
+	if _, err := serverConn.Write(resp); err != nil {
+		t.Errorf("server: write response: %v", err)
+	}
+}
+
+func TestSendAndFetchResponse_ErrorStatus(t *testing.T) {
+	c, serverConn := newTestClient(t)
+
+	go serverRespond(t, serverConn, uint32(ierror.UnauthenticatedCode), nil)
+
+	_, err := c.sendAndFetchResponse(context.Background(), []byte{}, command.Code(0))
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	// Should return the iggy error corresponding to the status code.
+	if !errors.Is(err, ierror.ErrUnauthenticated) {
+		t.Errorf("got %v, want %v", err, ierror.ErrUnauthenticated)
+	}
+	// Connection should remain healthy after an application-level error.
+	if c.state != iggcon.StateConnected {
+		t.Errorf("expected state %v, got %v", iggcon.StateConnected, c.state)
+	}
+}
+
+func TestSendAndFetchResponse_SuccessEmptyBody(t *testing.T) {
+	c, serverConn := newTestClient(t)
+
+	go serverRespond(t, serverConn, 0, nil)
+
+	result, err := c.sendAndFetchResponse(context.Background(), []byte{}, command.Code(0))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) != 0 {
+		t.Errorf("expected empty result, got %d bytes", len(result))
+	}
+	if c.state != iggcon.StateConnected {
+		t.Errorf("expected state %v, got %v", iggcon.StateConnected, c.state)
+	}
+}
+
+func TestSendAndFetchResponse_SuccessWithBody(t *testing.T) {
+	c, serverConn := newTestClient(t)
+
+	body := []byte("hello iggy")
+	go serverRespond(t, serverConn, 0, body)
+
+	result, err := c.sendAndFetchResponse(context.Background(), []byte{}, command.Code(0))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if string(result) != string(body) {
+		t.Errorf("got %q, want %q", result, body)
+	}
+	if c.state != iggcon.StateConnected {
+		t.Errorf("expected state %v, got %v", iggcon.StateConnected, c.state)
 	}
 }
