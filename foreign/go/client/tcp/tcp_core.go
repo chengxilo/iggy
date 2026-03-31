@@ -300,16 +300,26 @@ func (c *IggyTcpClient) sendAndFetchResponse(ctx context.Context, message []byte
 		_ = c.conn.SetDeadline(time.Time{})
 	}
 
+	// ioError returns ctx.Err() when the context caused the I/O failure,
+	// so callers get a consistent context.Canceled / context.DeadlineExceeded
+	// instead of a low-level net timeout error.
+	ioError := func(err error) error {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
+		}
+		return err
+	}
+
 	payload := createPayload(message, command)
 	if _, err := c.write(payload); err != nil {
 		c.invalidateConnLocked()
-		return nil, err
+		return nil, ioError(err)
 	}
 
 	readBytes, buffer, err := c.read(ResponseInitialBytesLength)
 	if err != nil {
 		c.invalidateConnLocked()
-		return nil, fmt.Errorf("failed to read response for TCP request: %w", err)
+		return nil, ioError(err)
 	}
 
 	if readBytes != ResponseInitialBytesLength {
@@ -331,7 +341,7 @@ func (c *IggyTcpClient) sendAndFetchResponse(ctx context.Context, message []byte
 	_, buffer, err = c.read(length)
 	if err != nil {
 		c.invalidateConnLocked()
-		return nil, err
+		return nil, ioError(err)
 	}
 
 	clearDeadline()
