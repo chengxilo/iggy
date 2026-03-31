@@ -281,42 +281,67 @@ func (c *IggyTcpClient) sendAndFetchResponse(ctx context.Context, message []byte
 		return nil, err
 	}
 
-	if deadline, ok := ctx.Deadline(); ok {
-		if err := c.conn.SetDeadline(deadline); err != nil {
-			return nil, err
-		}
-		defer func() { _ = c.conn.SetDeadline(time.Time{}) }()
+	// deadlineMu makes sure that the deadline won't be set to now by the
+	// AfterFunc callback right after we call SetDeadline(time.Time{}) to
+	// clear the deadline after the operation is done.
+	var deadlineMu sync.Mutex
+
+	stop := context.AfterFunc(ctx, func() {
+		deadlineMu.Lock()
+		defer deadlineMu.Unlock()
+		_ = c.conn.SetDeadline(time.Now())
+	})
+	defer stop()
+
+	clearDeadline := func() {
+		stop()
+		deadlineMu.Lock()
+		defer deadlineMu.Unlock()
+		_ = c.conn.SetDeadline(time.Time{})
 	}
 
 	payload := createPayload(message, command)
 	if _, err := c.write(payload); err != nil {
+		c.invalidateConnLocked()
 		return nil, err
 	}
 
 	readBytes, buffer, err := c.read(ResponseInitialBytesLength)
 	if err != nil {
+		c.invalidateConnLocked()
 		return nil, fmt.Errorf("failed to read response for TCP request: %w", err)
 	}
 
 	if readBytes != ResponseInitialBytesLength {
+		c.invalidateConnLocked()
 		return nil, fmt.Errorf("received an invalid or empty response: %w", ierror.EmptyResponse{})
 	}
 
 	if status := ierror.Code(binary.LittleEndian.Uint32(buffer[0:4])); status != 0 {
+		clearDeadline()
 		return nil, ierror.FromCode(status)
 	}
 
 	length := int(binary.LittleEndian.Uint32(buffer[4:]))
 	if length <= 1 {
+		clearDeadline()
 		return []byte{}, nil
 	}
 
 	_, buffer, err = c.read(length)
 	if err != nil {
+		c.invalidateConnLocked()
 		return nil, err
 	}
 
+	clearDeadline()
 	return buffer, nil
+}
+
+// invalidateConnLocked closes the connection and marks it as disconnected
+func (c *IggyTcpClient) invalidateConnLocked() {
+	_ = c.conn.Close()
+	c.state = iggcon.StateDisconnected
 }
 
 func createPayload(message []byte, command command.Code) []byte {

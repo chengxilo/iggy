@@ -125,4 +125,31 @@ func TestSendAndFetchResponse_DeadlineTimeout(t *testing.T) {
 	if !netErr.Timeout() {
 		t.Errorf("expected timeout error, got %v", err)
 	}
+	// After a timeout, the connection should be invalidated.
+	if c.state != iggcon.StateDisconnected {
+		t.Errorf("expected state %v, got %v", iggcon.StateDisconnected, c.state)
+	}
+}
+
+func TestSendAndFetchResponse_CancelDuringIO(t *testing.T) {
+	c, _ := newTestClient(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Cancel the context after a short delay to unblock the I/O.
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		cancel()
+	}()
+
+	// Server does not respond, so the client blocks until the context is cancelled.
+	_, err := c.sendAndFetchResponse(ctx, []byte{}, command.Code(0))
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	// Connection should be invalidated after the I/O error.
+	if c.state != iggcon.StateDisconnected {
+		t.Errorf("expected state %v, got %v", iggcon.StateDisconnected, c.state)
+	}
 }
