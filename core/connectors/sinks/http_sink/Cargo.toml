@@ -16,20 +16,17 @@
 # under the License.
 
 [package]
-name = "iggy_connector_influxdb_source"
+name = "iggy_connector_http_sink"
 version = "0.3.3-edge.1"
-description = "Iggy InfluxDB source connector for polling Flux query results"
+description = "Iggy HTTP sink connector for delivering stream messages to any HTTP endpoint via webhooks, REST APIs, or serverless functions."
 edition = "2024"
 license = "Apache-2.0"
-keywords = ["iggy", "messaging", "streaming", "influxdb", "source"]
+keywords = ["iggy", "messaging", "streaming", "http", "sink"]
 categories = ["command-line-utilities", "database", "network-programming"]
 homepage = "https://iggy.apache.org"
 documentation = "https://iggy.apache.org/docs"
 repository = "https://github.com/apache/iggy"
 readme = "../../README.md"
-
-[package.metadata.cargo-machete]
-ignored = ["dashmap", "once_cell", "futures"]
 
 [lib]
 crate-type = ["cdylib", "lib"]
@@ -37,18 +34,19 @@ crate-type = ["cdylib", "lib"]
 [dependencies]
 async-trait = { workspace = true }
 base64 = { workspace = true }
-csv = { workspace = true }
-dashmap = { workspace = true }
-futures = { workspace = true }
-iggy_common = { workspace = true }
+bytes = { workspace = true }
+humantime = { workspace = true }
 iggy_connector_sdk = { workspace = true }
-once_cell = { workspace = true }
-regex = { workspace = true }
 reqwest = { workspace = true }
 reqwest-middleware = { workspace = true }
-secrecy = { workspace = true }
+reqwest-retry = { workspace = true }
+reqwest-tracing = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+simd-json = { workspace = true }
+strum_macros = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
-uuid = { workspace = true }
+
+[dev-dependencies]
+toml = { workspace = true }
