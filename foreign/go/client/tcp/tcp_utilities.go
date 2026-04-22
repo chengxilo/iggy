@@ -19,6 +19,7 @@ package tcp
 
 import (
 	"context"
+
 	iggcon "github.com/apache/iggy/foreign/go/contracts"
 	"github.com/apache/iggy/foreign/go/internal/command"
 )
