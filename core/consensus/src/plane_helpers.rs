@@ -15,114 +15,21 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use crate::client_table::{Notify, RequestStatus};
 use crate::{
     Consensus, IgnoreReason, Pipeline, PipelineEntry, PlaneKind, PrepareOkOutcome, Sequencer,
     Status, VsrConsensus,
 };
 use iggy_binary_protocol::consensus::iobuf::Owned;
 use iggy_binary_protocol::{
-    Command2, GenericHeader, Message, PrepareHeader, PrepareOkHeader, ReplyHeader,
+    Command2, Message, PrepareHeader, PrepareOkHeader, ReplyHeader, RequestHeader,
 };
-use message_bus::MessageBus;
+use message_bus::{MessageBus, SendError};
 use std::ops::AsyncFnOnce;
 
-// TODO: Rework all of those helpers, once the boundaries are more clear and we have a better picture of the commonalities between all of the planes.
-
-/// Shared request preflight: duplicate detection + pending registration.
-///
-/// Returns `Some(Notify)` if the request is new and should proceed through
-/// consensus. Returns `None` if the request was already handled (duplicate
-/// reply sent, in-progress, stale, or session error), the caller should
-/// return early.
-#[allow(clippy::future_not_send)]
-pub async fn request_preflight<B, P>(
-    consensus: &VsrConsensus<B, P>,
-    client_id: u128,
-    session: u64,
-    request: u64,
-) -> Option<Notify>
-where
-    B: MessageBus<Replica = u8, Data = Message<GenericHeader>, Client = u128>,
-    P: Pipeline<Entry = PipelineEntry>,
-{
-    let status = consensus
-        .client_table()
-        .borrow()
-        .check_request(client_id, session, request);
-    match status {
-        RequestStatus::Duplicate(cached_reply) => {
-            // Best-effort resend, client may have disconnected.
-            let _ = consensus
-                .message_bus()
-                .send_to_client(client_id, cached_reply.into_generic())
-                .await;
-            None
-        }
-        RequestStatus::InProgress
-        | RequestStatus::Stale
-        | RequestStatus::NoSession
-        | RequestStatus::SessionMismatch { .. }
-        | RequestStatus::RequestGap { .. }
-        | RequestStatus::AlreadyRegistered { .. } => None,
-        RequestStatus::New => {
-            let notify = consensus
-                .client_table()
-                .borrow_mut()
-                .register_pending(client_id, request);
-            Some(notify)
-        }
-    }
-}
-
-/// Shared register preflight: duplicate detection for `Operation::Register`.
-///
-/// Returns `Some(Notify)` if the register is new and should proceed through
-/// consensus. Returns `None` if the client is already registered (session
-/// number sent back) or the register is already in progress.
-#[allow(clippy::future_not_send, clippy::unused_async)]
-pub async fn register_preflight<B, P>(
-    consensus: &VsrConsensus<B, P>,
-    client_id: u128,
-) -> Option<Notify>
-where
-    B: MessageBus<Replica = u8, Data = Message<GenericHeader>, Client = u128>,
-    P: Pipeline<Entry = PipelineEntry>,
-{
-    let status = consensus.client_table().borrow().check_register(client_id);
-    match status {
-        RequestStatus::AlreadyRegistered { session } => {
-            // Synthesize a register reply with the existing session.
-            // The caller can extract session from reply.header().commit.
-            tracing::debug!(
-                client_id,
-                session,
-                "register_preflight: client already registered, ignoring"
-            );
-            None
-        }
-        RequestStatus::InProgress => None,
-        RequestStatus::New => {
-            let notify = consensus
-                .client_table()
-                .borrow_mut()
-                .register_pending(client_id, 0);
-            Some(notify)
-        }
-        // check_register only returns AlreadyRegistered, InProgress, or New.
-        other => {
-            tracing::warn!(client_id, ?other, "register_preflight: unexpected status");
-            None
-        }
-    }
-}
-
-/// Shared pipeline-first request flow used by metadata and partitions.
+/// Shared pipeline-first request flow (metadata + partitions).
 ///
 /// # Panics
-/// - If the caller is not the primary.
-/// - If the consensus status is not normal.
-/// - If the consensus is syncing.
+/// If not primary, status not Normal, or syncing.
 #[allow(clippy::future_not_send)]
 pub async fn pipeline_prepare_common<C, F>(
     consensus: &C,
@@ -154,7 +61,7 @@ pub const fn fence_old_prepare_by_commit<B, P>(
     header: &PrepareHeader,
 ) -> bool
 where
-    B: MessageBus<Replica = u8, Data = Message<GenericHeader>, Client = u128>,
+    B: MessageBus,
     P: Pipeline<Entry = PipelineEntry>,
 {
     header.op <= consensus.commit_min()
@@ -162,18 +69,25 @@ where
 
 /// Shared chain-replication forwarding to the next replica.
 ///
+/// Borrows the message, makes a deep copy for the wire, and lets the caller
+/// retain ownership for journal append.
+///
+/// # Errors
+///
+/// Returns `SendError` if the bus fails to deliver to the next replica.
+/// Callers decide error policy (VSR retransmits from WAL via prepare timeout).
+///
 /// # Panics
 /// - If `header.command` is not `Command2::Prepare`.
 /// - If `header.op <= consensus.commit_min()`.
 /// - If the computed next replica equals self.
-/// - If the message bus send fails.
 #[allow(clippy::future_not_send)]
 pub async fn replicate_to_next_in_chain<B, P>(
     consensus: &VsrConsensus<B, P>,
-    message: Message<PrepareHeader>,
-) -> Message<PrepareHeader>
+    message: &Message<PrepareHeader>,
+) -> Result<(), SendError>
 where
-    B: MessageBus<Replica = u8, Data = Message<GenericHeader>, Client = u128>,
+    B: MessageBus,
     P: Pipeline<Entry = PipelineEntry>,
 {
     let header = *message.header();
@@ -185,20 +99,18 @@ where
     let primary = consensus.primary_index(header.view);
 
     if next == primary {
-        return message;
+        return Ok(());
     }
 
     assert_ne!(next, consensus.replica());
 
-    // TODO: Propagate send error instead of panicking; requires bus error design.
-    let returned = consensus
-        .message_bus()
-        .send_to_replica(next, message.into_generic())
-        .await
-        .unwrap();
-    returned
-        .try_into_typed()
-        .expect("replica send must return the same prepare message")
+    // Chain replication to the next replica is N=1, so the freeze-once
+    // trick does not apply: the caller has already appended `message` to
+    // its local journal (durability-before-ack) and kept a reference for
+    // this forward, so we deep_copy a fresh Frozen here. Future refactor
+    // could freeze once and share the backing with the journal path.
+    let frozen = message.deep_copy().into_generic().into_frozen();
+    consensus.message_bus().send_to_replica(next, frozen).await
 }
 
 /// Shared preflight checks for `on_replicate`.
@@ -216,7 +128,7 @@ pub fn replicate_preflight<B, P>(
     header: &PrepareHeader,
 ) -> Result<u64, IgnoreReason>
 where
-    B: MessageBus<Replica = u8, Data = Message<GenericHeader>, Client = u128>,
+    B: MessageBus,
     P: Pipeline<Entry = PipelineEntry>,
 {
     assert_eq!(header.command, Command2::Prepare);
@@ -249,7 +161,7 @@ where
 /// normal status.
 pub fn ack_preflight<B, P>(consensus: &VsrConsensus<B, P>) -> Result<(), IgnoreReason>
 where
-    B: MessageBus<Replica = u8, Data = Message<GenericHeader>, Client = u128>,
+    B: MessageBus,
     P: Pipeline<Entry = PipelineEntry>,
 {
     if !consensus.is_primary() {
@@ -274,7 +186,7 @@ pub fn ack_quorum_reached<B, P>(
     ack: &PrepareOkHeader,
 ) -> bool
 where
-    B: MessageBus<Replica = u8, Data = Message<GenericHeader>, Client = u128>,
+    B: MessageBus,
     P: Pipeline<Entry = PipelineEntry>,
 {
     if !matches!(
@@ -314,7 +226,7 @@ where
 /// If `head()` returns `Some` but `pop()` returns `None` (unreachable).
 pub fn drain_committable_prefix<B, P>(consensus: &VsrConsensus<B, P>) -> Vec<PipelineEntry>
 where
-    B: MessageBus<Replica = u8, Data = Message<GenericHeader>, Client = u128>,
+    B: MessageBus,
     P: Pipeline<Entry = PipelineEntry>,
 {
     let commit = consensus.commit_max();
@@ -335,24 +247,89 @@ where
     drained
 }
 
-/// Shared reply-message construction for committed prepare.
+/// Build reply for a committed prepare.
+///
+/// Every field except `size` comes from `prepare_header`, bytes are identical
+/// across replicas regardless of when they commit (primary inline, backup via
+/// `commit_journal`, promoted-primary via `register_preflight::AlreadyRegistered`).
+///
+/// **Not from current state**: cached reply lives in [`crate::ClientTable`]
+/// and may be replayed by any replica. Sourcing `view` from `consensus.view()`
+/// would let a post-view-change `commit_journal` stamp a different view than
+/// the original primary, diverging cached bytes for `(client, request)`.
+/// Reading from `prepare_header` makes determinism structural.
+///
+/// # Panics
+/// If buffer is not a valid reply.
+#[allow(clippy::cast_possible_truncation)]
+pub fn build_reply_message(
+    prepare_header: &PrepareHeader,
+    body: &bytes::Bytes,
+) -> Message<ReplyHeader> {
+    let header_size = std::mem::size_of::<ReplyHeader>();
+    let total_size = header_size + body.len();
+    let mut buffer = bytes::BytesMut::zeroed(total_size);
+
+    let header = bytemuck::checked::try_from_bytes_mut::<ReplyHeader>(&mut buffer[..header_size])
+        .expect("zeroed bytes are valid");
+    *header = ReplyHeader {
+        checksum: 0,
+        checksum_body: 0,
+        cluster: prepare_header.cluster,
+        size: total_size as u32,
+        // Commit-time view
+        view: prepare_header.view,
+        release: prepare_header.release,
+        command: Command2::Reply,
+        // Original primary's id
+        replica: prepare_header.replica,
+        reserved_frame: [0; 66],
+        request_checksum: prepare_header.request_checksum,
+        context: 0,
+        client: prepare_header.client,
+        op: prepare_header.op,
+        // Prepare's op (not commit_max): drives ClientTable eviction order;
+        // must be deterministic across replicas.
+        commit: prepare_header.op,
+        timestamp: prepare_header.timestamp,
+        request: prepare_header.request,
+        operation: prepare_header.operation,
+        namespace: prepare_header.namespace,
+        ..Default::default()
+    };
+
+    if !body.is_empty() {
+        buffer[header_size..].copy_from_slice(body);
+    }
+
+    // TODO: drop this copy once replies stop round-tripping through `Bytes`
+    // and the binary protocol uses `Owned` end-to-end.
+    Message::try_from(Owned::<4096>::copy_from_slice(buffer.as_ref()))
+        .expect("reply buffer must contain a valid reply message")
+}
+
+/// Reply for fast paths that skip the VSR pipeline (e.g. `AckLevel::NoAck`).
+///
+/// Stamps `op` and `commit` with `commit_max` — monotonic, so
+/// `ClientTable::commit_reply` regression checks always pass.
 ///
 /// # Panics
 /// If the constructed message buffer is not valid.
 #[allow(clippy::needless_pass_by_value, clippy::cast_possible_truncation)]
-pub fn build_reply_message<B, P>(
+pub fn build_reply_from_request<B, P>(
     consensus: &VsrConsensus<B, P>,
-    prepare_header: &PrepareHeader,
+    request_header: &RequestHeader,
     body: bytes::Bytes,
 ) -> Message<ReplyHeader>
 where
-    B: MessageBus<Replica = u8, Data = Message<GenericHeader>, Client = u128>,
+    B: MessageBus,
     P: Pipeline<Entry = PipelineEntry>,
 {
     let header_size = std::mem::size_of::<ReplyHeader>();
     let total_size = header_size + body.len();
     let mut buffer = bytes::BytesMut::zeroed(total_size);
 
+    let commit = consensus.commit_max();
     let header = bytemuck::checked::try_from_bytes_mut::<ReplyHeader>(&mut buffer[..header_size])
         .expect("zeroed bytes are valid");
     *header = ReplyHeader {
@@ -365,17 +342,15 @@ where
         command: Command2::Reply,
         replica: consensus.replica(),
         reserved_frame: [0; 66],
-        request_checksum: prepare_header.request_checksum,
+        request_checksum: request_header.request_checksum,
         context: 0,
-        client: prepare_header.client,
-        op: prepare_header.op,
-        // Use the prepare's op, not commit_max. This value drives eviction
-        // ordering in ClientTable, it must be deterministic across replicas.
-        commit: prepare_header.op,
-        timestamp: prepare_header.timestamp,
-        request: prepare_header.request,
-        operation: prepare_header.operation,
-        namespace: prepare_header.namespace,
+        client: request_header.client,
+        op: commit,
+        commit,
+        timestamp: request_header.timestamp,
+        request: request_header.request,
+        operation: request_header.operation,
+        namespace: request_header.namespace,
         ..Default::default()
     };
 
@@ -383,8 +358,6 @@ where
         buffer[header_size..].copy_from_slice(&body);
     }
 
-    // TODO: Remove this copy once replies stop round-tripping through `Bytes`
-    // and the binary protocol uses `Owned` end-to-end.
     Message::try_from(Owned::<4096>::copy_from_slice(buffer.as_ref()))
         .expect("reply buffer must contain a valid reply message")
 }
@@ -417,7 +390,7 @@ pub async fn send_prepare_ok<B, P>(
     header: &PrepareHeader,
     is_persisted: Option<bool>,
 ) where
-    B: MessageBus<Replica = u8, Data = Message<GenericHeader>, Client = u128>,
+    B: MessageBus,
     P: Pipeline<Entry = PipelineEntry>,
 {
     assert_eq!(header.command, Command2::Prepare);
@@ -476,47 +449,28 @@ pub async fn send_prepare_ok<B, P>(
 mod tests {
     use super::*;
     use crate::{Consensus, LocalPipeline};
-    use iggy_common::IggyError;
+    use iggy_binary_protocol::consensus::MESSAGE_ALIGN;
+    use iggy_binary_protocol::consensus::iobuf::Frozen;
+    use message_bus::SendError;
 
     #[derive(Debug, Default)]
     struct NoopBus;
 
     impl MessageBus for NoopBus {
-        type Client = u128;
-        type Replica = u8;
-        type Data = Message<GenericHeader>;
-        type Sender = ();
-
-        fn add_client(&mut self, _client: Self::Client, _sender: Self::Sender) -> bool {
-            true
-        }
-
-        fn remove_client(&mut self, _client: Self::Client) -> bool {
-            true
-        }
-
-        fn add_replica(&mut self, _replica: Self::Replica) -> bool {
-            true
-        }
-
-        fn remove_replica(&mut self, _replica: Self::Replica) -> bool {
-            true
-        }
-
         async fn send_to_client(
             &self,
-            _client_id: Self::Client,
-            data: Self::Data,
-        ) -> Result<Self::Data, IggyError> {
-            Ok(data)
+            _client_id: u128,
+            _data: Frozen<MESSAGE_ALIGN>,
+        ) -> Result<(), SendError> {
+            Ok(())
         }
 
         async fn send_to_replica(
             &self,
-            _replica: Self::Replica,
-            data: Self::Data,
-        ) -> Result<Self::Data, IggyError> {
-            Ok(data)
+            _replica: u8,
+            _data: Frozen<MESSAGE_ALIGN>,
+        ) -> Result<(), SendError> {
+            Ok(())
         }
     }
 
@@ -601,9 +555,9 @@ mod tests {
         let consensus = VsrConsensus::new(1, 0, 3, 0, NoopBus, LocalPipeline::new());
         consensus.init();
 
-        // SVC from replica 1 for view 3.
-        // Replica 0 advances to view 3 (reset_view_change_state clears loopback),
-        // records own SVC + DVC, and records replica 1's SVC. DVC quorum needs 2, have 1.
+        // SVC from replica 1, view 3. Replica 0 advances to view 3
+        // (reset_view_change_state clears loopback), records own SVC+DVC and
+        // replica 1's SVC. DVC quorum needs 2; have 1.
         let svc = StartViewChangeHeader {
             checksum: 0,
             checksum_body: 0,
@@ -619,11 +573,11 @@ mod tests {
         };
         let _ = consensus.handle_start_view_change(PlaneKind::Metadata, &svc);
 
-        // Simulate an in-flight loopback message queued between SVC and DVC quorum.
+        // Stale loopback queued between SVC and DVC quorum.
         let stale_msg = Message::<PrepareOkHeader>::new(std::mem::size_of::<PrepareOkHeader>());
         consensus.push_loopback(stale_msg.into_generic());
 
-        // DVC from replica 2 for view 3 -- quorum reached, complete_view_change_as_primary fires.
+        // DVC from replica 2, view 3, quorum, complete_view_change_as_primary fires.
         let dvc = DoViewChangeHeader {
             checksum: 0,
             checksum_body: 0,
@@ -642,15 +596,15 @@ mod tests {
         };
         let actions = consensus.handle_do_view_change(PlaneKind::Metadata, &dvc);
 
-        // View change completed: should have SendStartView action.
+        // View change complete → SendStartView action.
         assert!(
             actions
                 .iter()
                 .any(|a| matches!(a, crate::VsrAction::SendStartView { .. })),
-            "expected SendStartView action after DVC quorum"
+            "expected SendStartView after DVC quorum"
         );
 
-        // The stale loopback message must have been cleared.
+        // Stale loopback must be cleared.
         let mut buf = Vec::new();
         consensus.drain_loopback_into(&mut buf);
         assert!(
@@ -661,7 +615,8 @@ mod tests {
 
     #[test]
     fn send_prepare_ok_sends_to_bus_when_not_primary() {
-        let consensus = VsrConsensus::new(1, 1, 3, 0, NoopBus, LocalPipeline::new());
+        // Replica 1, view 0; primary=0, so send_or_loopback takes bus path.
+        let consensus = VsrConsensus::new(1, 1, 3, 0, SpyBus::new(), LocalPipeline::new());
         consensus.init();
 
         let prepare_header = PrepareHeader {
@@ -677,11 +632,22 @@ mod tests {
 
         let mut buf = Vec::new();
         consensus.drain_loopback_into(&mut buf);
-        assert!(buf.is_empty());
+        assert!(buf.is_empty(), "non-primary must not loopback");
+
+        let sent = consensus.message_bus().sent.borrow();
+        assert_eq!(
+            sent.len(),
+            1,
+            "exactly one PrepareOk must be sent to the bus"
+        );
+        assert_eq!(
+            sent[0].0, 0,
+            "addressed to the primary (replica 0 in view 0)"
+        );
     }
 
     struct SpyBus {
-        sent: std::cell::RefCell<Vec<(u8, Message<GenericHeader>)>>,
+        sent: std::cell::RefCell<Vec<(u8, Frozen<MESSAGE_ALIGN>)>>,
     }
 
     impl SpyBus {
@@ -694,39 +660,20 @@ mod tests {
 
     #[allow(clippy::future_not_send)]
     impl MessageBus for SpyBus {
-        type Client = u128;
-        type Replica = u8;
-        type Data = Message<GenericHeader>;
-        type Sender = ();
-
-        fn add_client(&mut self, _client: Self::Client, _sender: Self::Sender) -> bool {
-            true
-        }
-        fn remove_client(&mut self, _client: Self::Client) -> bool {
-            true
-        }
-        fn add_replica(&mut self, _replica: Self::Replica) -> bool {
-            true
-        }
-        fn remove_replica(&mut self, _replica: Self::Replica) -> bool {
-            true
-        }
         async fn send_to_client(
             &self,
-            _client_id: Self::Client,
-            data: Self::Data,
-        ) -> Result<Self::Data, IggyError> {
-            Ok(data)
+            _client_id: u128,
+            _data: Frozen<MESSAGE_ALIGN>,
+        ) -> Result<(), SendError> {
+            Ok(())
         }
         async fn send_to_replica(
             &self,
-            replica: Self::Replica,
-            data: Self::Data,
-        ) -> Result<Self::Data, IggyError> {
-            let stored = data.deep_copy();
-            let returned = data.deep_copy();
-            self.sent.borrow_mut().push((replica, stored));
-            Ok(returned)
+            replica: u8,
+            data: Frozen<MESSAGE_ALIGN>,
+        ) -> Result<(), SendError> {
+            self.sent.borrow_mut().push((replica, data));
+            Ok(())
         }
     }
 
@@ -759,23 +706,6 @@ mod tests {
         let sent = consensus.message_bus().sent.borrow();
         assert_eq!(sent.len(), 1);
         assert_eq!(sent[0].0, 1);
-    }
-
-    #[test]
-    fn drains_head_prefix_by_commit_frontier() {
-        let consensus = VsrConsensus::new(1, 0, 3, 0, NoopBus, LocalPipeline::new());
-        consensus.init();
-
-        consensus.pipeline_message(PlaneKind::Metadata, &prepare_message(1, 0, 10));
-        consensus.pipeline_message(PlaneKind::Metadata, &prepare_message(2, 10, 20));
-        consensus.pipeline_message(PlaneKind::Metadata, &prepare_message(3, 20, 30));
-
-        consensus.advance_commit_max(3);
-
-        let drained = drain_committable_prefix(&consensus);
-        let drained_ops: Vec<_> = drained.into_iter().map(|entry| entry.header.op).collect();
-        assert_eq!(drained_ops, vec![1, 2, 3]);
-        assert!(consensus.pipeline().borrow().is_empty());
     }
 
     #[test]

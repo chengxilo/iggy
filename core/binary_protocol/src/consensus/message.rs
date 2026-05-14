@@ -24,7 +24,7 @@ use crate::consensus::{
 use smallvec::SmallVec;
 use std::{marker::PhantomData, mem::size_of};
 
-const MESSAGE_ALIGN: usize = 4096;
+pub const MESSAGE_ALIGN: usize = 4096;
 
 pub trait MessageBacking<H>
 where
@@ -551,6 +551,11 @@ where
             Command2::Commit => {
                 let msg = unsafe { Message::<CommitHeader>::from_backing_unchecked(backing) };
                 Ok(Self::Commit(msg))
+            }
+            // Reply / Eviction are server-to-client frames; they do not
+            // appear on the inbound dispatch path.
+            Command2::Reply | Command2::Eviction => {
+                Err(ConsensusError::ClientBoundCommand(command))
             }
             other => Err(ConsensusError::InvalidCommand {
                 expected: Command2::Reserved,

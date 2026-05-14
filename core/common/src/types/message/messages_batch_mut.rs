@@ -448,8 +448,7 @@ impl IggyMessagesBatchMut {
         &self,
         absolute_start_offset: u64,
     ) -> Result<(), IggyError> {
-        let mut current_offset = absolute_start_offset;
-        for message in self.iter() {
+        for (current_offset, message) in (absolute_start_offset..).zip(self.iter()) {
             let calculated_checksum = message.calculate_checksum();
             let actual_checksum = message.header().checksum();
             let offset = message.header().offset();
@@ -463,7 +462,6 @@ impl IggyMessagesBatchMut {
                     offset,
                 ));
             }
-            current_offset += 1;
         }
         Ok(())
     }
@@ -821,13 +819,12 @@ impl Index<usize> for IggyMessagesBatchMut {
     type Output = [u8];
 
     fn index(&self, index: usize) -> &Self::Output {
-        if index >= self.count() as usize {
-            panic!(
-                "Index out of bounds: the len is {} but the index is {}",
-                self.count(),
-                index
-            );
-        }
+        assert!(
+            index < self.count() as usize,
+            "Index out of bounds: the len is {} but the index is {}",
+            self.count(),
+            index
+        );
 
         let (start, end) = self
             .get_message_boundaries(index)
