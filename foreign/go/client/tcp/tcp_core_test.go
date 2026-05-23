@@ -22,7 +22,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"net"
-	"strings"
 	"testing"
 	"time"
 
@@ -61,8 +60,8 @@ func TestSendAndFetchResponse_NilContext(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	if !strings.Contains(err.Error(), "nil context") {
-		t.Errorf("got %q, want it to contain %q", err.Error(), "nil context")
+	if !errors.Is(err, ierror.ErrNilContext) {
+		t.Errorf("got %v, want %v", err, ierror.ErrNilContext)
 	}
 }
 

@@ -22,7 +22,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -268,7 +267,7 @@ func (c *IggyTcpClient) do(ctx context.Context, cmd command.Command) ([]byte, er
 
 func (c *IggyTcpClient) sendAndFetchResponse(ctx context.Context, message []byte, command command.Code) ([]byte, error) {
 	if ctx == nil {
-		return nil, errors.New("nil context")
+		return nil, ierror.ErrNilContext
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
