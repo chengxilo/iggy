@@ -214,6 +214,7 @@ type Client interface {
 	// DeleteSegments deletes N segments from a topic partition by stream and topic unique IDs or names.
 	// Authentication is required, and the permission to manage the partitions.
 	DeleteSegments(
+		ctx context.Context,
 		streamId Identifier,
 		topicId Identifier,
 		partitionId uint32,
