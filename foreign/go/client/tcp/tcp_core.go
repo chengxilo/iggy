@@ -300,7 +300,6 @@ func (c *IggyTcpClient) sendAndFetchResponse(ctx context.Context, message []byte
 
 	result, err := c.sendLocked(message, command)
 
-	stop()
 	// clear the deadline of connection.
 	deadlineMu.Lock()
 	cleared = true
