@@ -280,6 +280,7 @@ func (c *IggyTcpClient) sendAndFetchResponse(ctx context.Context, message []byte
 		return nil, err
 	}
 
+	// fast path for non-cancellable ctx.
 	if ctx.Done() == nil {
 		return c.sendLocked(message, command)
 	}
