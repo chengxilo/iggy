@@ -126,6 +126,8 @@ func TestSendAndFetchResponse_DeadlineTimeout(t *testing.T) {
 	if c.state != iggcon.StateDisconnected {
 		t.Errorf("expected state %v, got %v", iggcon.StateDisconnected, c.state)
 	}
+
+	// TODO: revisit after reconnect implementation
 }
 
 func TestSendAndFetchResponse_CancelDuringIO(t *testing.T) {
