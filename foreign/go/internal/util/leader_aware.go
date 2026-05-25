@@ -19,6 +19,7 @@ package util
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -35,6 +36,9 @@ func CheckAndRedirectToLeader(ctx context.Context, c iggcon.Client, currentAddre
 
 	meta, err := c.GetClusterMetadata(ctx)
 	if err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return "", err
+		}
 		log.Printf("Failed to get cluster metadata: %v, connection will continue on server node %s\n", err, currentAddress)
 		return "", nil
 	}
