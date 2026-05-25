@@ -353,7 +353,9 @@ func (c *IggyTcpClient) sendLocked(message []byte, command command.Code) ([]byte
 
 // invalidateConnLocked closes the connection and marks it as disconnected
 func (c *IggyTcpClient) invalidateConnLocked() {
-	_ = c.conn.Close()
+	if c.conn != nil {
+		_ = c.conn.Close()
+	}
 	c.state = iggcon.StateDisconnected
 }
 
