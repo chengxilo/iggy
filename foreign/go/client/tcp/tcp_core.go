@@ -280,45 +280,52 @@ func (c *IggyTcpClient) sendAndFetchResponse(ctx context.Context, message []byte
 		return nil, err
 	}
 
-	// deadlineMu makes sure that the deadline won't be set to now by the
-	// AfterFunc callback right after we call SetDeadline(time.Time{}) to
-	// clear the deadline after the operation is done.
+	if ctx.Done() == nil {
+		return c.sendLocked(message, command)
+	}
+
+	conn := c.conn
 	var deadlineMu sync.Mutex
+	cleared := false
 
 	stop := context.AfterFunc(ctx, func() {
 		deadlineMu.Lock()
 		defer deadlineMu.Unlock()
-		_ = c.conn.SetDeadline(time.Now())
+		if !cleared {
+			_ = conn.SetDeadline(time.Now())
+		}
 	})
 	defer stop()
 
-	clearDeadline := func() {
-		stop()
-		deadlineMu.Lock()
-		defer deadlineMu.Unlock()
-		_ = c.conn.SetDeadline(time.Time{})
-	}
+	result, err := c.sendLocked(message, command)
 
-	// ioError returns ctx.Err() when the context caused the I/O failure,
-	// so callers get a consistent context.Canceled / context.DeadlineExceeded
-	// instead of a low-level net timeout error.
-	ioError := func(err error) error {
+	stop()
+	// clear the deadline of connection.
+	deadlineMu.Lock()
+	cleared = true
+	_ = conn.SetDeadline(time.Time{})
+	deadlineMu.Unlock()
+
+	if err != nil {
 		if ctxErr := ctx.Err(); ctxErr != nil {
-			return ctxErr
+			return nil, ctxErr
 		}
-		return err
+		return nil, err
 	}
+	return result, nil
+}
 
+func (c *IggyTcpClient) sendLocked(message []byte, command command.Code) ([]byte, error) {
 	payload := createPayload(message, command)
 	if _, err := c.write(payload); err != nil {
 		c.invalidateConnLocked()
-		return nil, ioError(err)
+		return nil, err
 	}
 
 	readBytes, buffer, err := c.read(ResponseInitialBytesLength)
 	if err != nil {
 		c.invalidateConnLocked()
-		return nil, ioError(err)
+		return nil, err
 	}
 
 	if readBytes != ResponseInitialBytesLength {
@@ -327,23 +334,20 @@ func (c *IggyTcpClient) sendAndFetchResponse(ctx context.Context, message []byte
 	}
 
 	if status := ierror.Code(binary.LittleEndian.Uint32(buffer[0:4])); status != 0 {
-		clearDeadline()
 		return nil, ierror.FromCode(status)
 	}
 
 	length := int(binary.LittleEndian.Uint32(buffer[4:]))
 	if length <= 1 {
-		clearDeadline()
 		return []byte{}, nil
 	}
 
 	_, buffer, err = c.read(length)
 	if err != nil {
 		c.invalidateConnLocked()
-		return nil, ioError(err)
+		return nil, err
 	}
 
-	clearDeadline()
 	return buffer, nil
 }
 
