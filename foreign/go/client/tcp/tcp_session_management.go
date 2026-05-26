@@ -43,7 +43,7 @@ func (c *IggyTcpClient) LoginUser(ctx context.Context, username string, password
 		return nil, err
 	}
 	if shouldRedirect {
-		if err = c.connect(); err != nil {
+		if err = c.Connect(ctx); err != nil {
 			return nil, err
 		}
 		return c.LoginUser(ctx, username, password)
@@ -65,7 +65,7 @@ func (c *IggyTcpClient) LoginWithPersonalAccessToken(ctx context.Context, token 
 		return nil, err
 	}
 	if shouldRedirect {
-		if err = c.connect(); err != nil {
+		if err = c.Connect(ctx); err != nil {
 			return nil, err
 		}
 		return c.LoginWithPersonalAccessToken(ctx, token)

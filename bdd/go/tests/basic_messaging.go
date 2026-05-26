@@ -72,6 +72,10 @@ func (s basicMessagingSteps) givenAuthenticationAsRoot(ctx context.Context) erro
 	if err != nil {
 		return fmt.Errorf("error creating client: %w", err)
 	}
+
+	if err = cli.Connect(ctx); err != nil {
+		return fmt.Errorf("error connecting to server: %w", err)
+	}
 	if err = cli.Ping(ctx); err != nil {
 		return fmt.Errorf("error pinging client: %w", err)
 	}

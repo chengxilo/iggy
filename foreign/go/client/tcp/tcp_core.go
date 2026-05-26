@@ -195,7 +195,7 @@ func WithTLSValidateCertificate(validate bool) TLSOption {
 
 // NewIggyTcpClient creates a new Iggy TCP client with the given options.
 // warning: don't use this function directly, use iggycli.NewIggyClient with iggycli.WithTcp instead.
-func NewIggyTcpClient(options ...Option) (*IggyTcpClient, error) {
+func NewIggyTcpClient(options ...Option) *IggyTcpClient {
 	opts := GetDefaultOptions()
 	for _, opt := range options {
 		if opt != nil {
@@ -203,7 +203,7 @@ func NewIggyTcpClient(options ...Option) (*IggyTcpClient, error) {
 		}
 	}
 
-	cli := &IggyTcpClient{
+	return &IggyTcpClient{
 		config:                 opts.config,
 		clientAddress:          "",
 		conn:                   nil,
@@ -212,12 +212,6 @@ func NewIggyTcpClient(options ...Option) (*IggyTcpClient, error) {
 		leaderRedirectionState: iggcon.LeaderRedirectionState{},
 		currentServerAddress:   opts.config.serverAddress,
 	}
-
-	if err := cli.connect(); err != nil {
-		return nil, err
-	}
-
-	return cli, nil
 }
 
 const (
@@ -377,7 +371,8 @@ func (c *IggyTcpClient) GetConnectionInfo() *iggcon.ConnectionInfo {
 	}
 }
 
-func (c *IggyTcpClient) connect() error {
+// Connect establishes the TCP connection to the server.
+func (c *IggyTcpClient) Connect(ctx context.Context) error {
 	c.mtx.Lock()
 	switch c.state {
 	case iggcon.StateShutdown:
@@ -415,12 +410,13 @@ func (c *IggyTcpClient) connect() error {
 
 	var conn net.Conn
 	if err := retry.New(
+		retry.Context(ctx),
 		retry.Attempts(attempts),
 		retry.Delay(interval),
 		retry.DelayType(retry.FixedDelay),
 	).Do(
 		func() error {
-			connection, err := net.Dial("tcp", c.currentServerAddress)
+			connection, err := (&net.Dialer{}).DialContext(ctx, "tcp", c.currentServerAddress)
 			if err != nil {
 				return ierror.ErrCannotEstablishConnection
 			}

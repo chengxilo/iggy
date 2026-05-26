@@ -53,6 +53,9 @@ func BenchmarkSendMessage(b *testing.B) {
 		if err != nil {
 			panic("COULD NOT CREATE MESSAGE STREAM")
 		}
+		if err = cli.Connect(context.Background()); err != nil {
+			panic("COULD NOT CONNECT")
+		}
 		_, err = cli.LoginUser(context.Background(), "iggy", "iggy")
 		if err != nil {
 			panic("COULD NOT LOG IN")

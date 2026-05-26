@@ -162,6 +162,7 @@ func TestTCPTLSConnection_WithCA_Success(t *testing.T) {
 		),
 	)
 	require.NoError(t, err, "Failed to create TLS client")
+	require.NoError(t, cli.Connect(context.Background()), "Failed to connect TLS client")
 	defer func() { _ = cli.Close() }()
 
 	_, err = cli.LoginUser(context.Background(), defaultUsername, defaultPassword)
@@ -189,10 +190,10 @@ func TestTCPTLSConnection_WithoutTLS_Failure(t *testing.T) {
 
 	if err == nil && cli != nil {
 		defer func() { _ = cli.Close() }()
-		_, err = cli.LoginUser(context.Background(), defaultUsername, defaultPassword)
+		err = cli.Connect(context.Background())
 	}
 
-	assert.Error(t, err, "Connection/login should fail when TLS is required but not used")
+	assert.Error(t, err, "Connection should fail when TLS is required but not used")
 }
 
 // TestTCPTLSConnection_MessageFlow_Success tests complete message flow
@@ -218,6 +219,7 @@ func TestTCPTLSConnection_MessageFlow_Success(t *testing.T) {
 		),
 	)
 	require.NoError(t, err, "Failed to create TLS client")
+	require.NoError(t, cli.Connect(context.Background()), "Failed to connect TLS client")
 	defer func() { _ = cli.Close() }()
 
 	_, err = cli.LoginUser(context.Background(), defaultUsername, defaultPassword)

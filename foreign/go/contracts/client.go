@@ -20,6 +20,9 @@ package iggcon
 import "context"
 
 type Client interface {
+	// Connect establishes the connection to the server.
+	Connect(ctx context.Context) error
+
 	// Close closes the client and releases all the resources.
 	Close() error
 

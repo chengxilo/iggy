@@ -52,6 +52,10 @@ func createClient() iggcon.Client {
 	if err != nil {
 		panic(err)
 	}
+	if err := cli.Connect(context.Background()); err != nil {
+		panic(err)
+	}
+
 	return cli
 }
 

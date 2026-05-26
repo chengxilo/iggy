@@ -49,6 +49,9 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	if err = cli.Connect(ctx); err != nil {
+		panic(err)
+	}
 	_, err = cli.LoginUser(ctx, "iggy", "iggy")
 	if err != nil {
 		panic("COULD NOT LOG IN")
