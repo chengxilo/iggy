@@ -287,6 +287,9 @@ func (c *IggyTcpClient) sendAndFetchResponse(ctx context.Context, message []byte
 		deadlineMu.Lock()
 		defer deadlineMu.Unlock()
 		if !cleared {
+			// Set a deadline in the past to unblock any ongoing read/write operations on the connection.
+			// This must use the snapshotted conn, not c.conn, to avoid setting a deadline on a
+			// new connection if Connect() reestablishes the connection after the context is cancelled.
 			_ = conn.SetDeadline(time.Now())
 		}
 	})
