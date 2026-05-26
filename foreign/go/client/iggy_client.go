@@ -95,9 +95,9 @@ func (ic *IggyClient) Connect(ctx context.Context) error {
 	if ic.heartbeatTriggered.Swap(true) {
 		return nil
 	}
-	lifetimeCtx, cancel := context.WithCancel(context.Background())
-	ic.cancel = cancel
 	if ic.heartbeatInterval > 0 {
+		lifetimeCtx, cancel := context.WithCancel(context.Background())
+		ic.cancel = cancel
 		ic.wg.Add(1)
 		go func() {
 			defer ic.wg.Done()
