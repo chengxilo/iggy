@@ -109,7 +109,7 @@ func (ic *IggyClient) Connect(ctx context.Context) error {
 					return
 				case <-ticker.C:
 					pingCtx, pingCancel := context.WithTimeout(lifetimeCtx, ic.heartbeatInterval/2)
-					if err := ic.Client.Ping(pingCtx); err != nil {
+					if err := ic.Ping(pingCtx); err != nil {
 						log.Printf("[WARN] heartbeat failed: %v", err)
 					}
 					pingCancel()
