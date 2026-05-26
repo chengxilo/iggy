@@ -52,8 +52,12 @@ func main() {
 		}
 	}()
 
-	log.Printf("Connecting to server at %s", serverAddr)
 	ctx := context.Background()
+	log.Printf("Connecting to server at %s", serverAddr)
+	if err := cli.Connect(ctx); err != nil {
+		log.Printf("Failed to connect to server at %s: %v", serverAddr, err)
+	}
+
 	_, err = cli.LoginUser(ctx, common.DefaultRootUsername, common.DefaultRootPassword)
 	if err != nil {
 		log.Fatal(err)
