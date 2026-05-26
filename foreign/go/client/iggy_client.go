@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/apache/iggy/foreign/go/client/tcp"
@@ -55,9 +56,10 @@ func WithTcp(tcpOpts ...tcp.Option) Option {
 
 type IggyClient struct {
 	iggcon.Client
-	cancel            context.CancelFunc
-	wg                sync.WaitGroup
-	heartbeatInterval time.Duration
+	cancel             context.CancelFunc
+	wg                 sync.WaitGroup
+	heartbeatInterval  time.Duration
+	heartbeatTriggered atomic.Bool
 }
 
 // NewIggyClient creates the IggyClient instance without connecting.
@@ -85,9 +87,13 @@ func NewIggyClient(options ...Option) (iggcon.Client, error) {
 	return ic, nil
 }
 
+// Connect establishes the connection to the server and starts the heartbeat loop if not started.
 func (ic *IggyClient) Connect(ctx context.Context) error {
 	if err := ic.Client.Connect(ctx); err != nil {
 		return err
+	}
+	if ic.heartbeatTriggered.Swap(true) {
+		return nil
 	}
 	lifetimeCtx, cancel := context.WithCancel(context.Background())
 	ic.cancel = cancel
