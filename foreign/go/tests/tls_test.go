@@ -187,13 +187,12 @@ func TestTCPTLSConnection_WithoutTLS_Failure(t *testing.T) {
 			tcp.WithServerAddress(connectAddr),
 		),
 	)
+	require.NoError(t, err, "Failed to create client")
+	defer func() { _ = cli.Close() }()
+	_ = cli.Connect(context.Background())
 
-	if err == nil && cli != nil {
-		defer func() { _ = cli.Close() }()
-		err = cli.Connect(context.Background())
-	}
-
-	assert.Error(t, err, "Connection should fail when TLS is required but not used")
+	_, err = cli.LoginUser(context.Background(), defaultUsername, defaultPassword)
+	assert.Error(t, err, "Login should fail when TLS is required but not used")
 }
 
 // TestTCPTLSConnection_MessageFlow_Success tests complete message flow
