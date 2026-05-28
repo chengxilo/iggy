@@ -22,7 +22,9 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/binary"
+	"errors"
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"strings"
@@ -171,6 +173,52 @@ func WithTLS(tlsOpts ...TLSOption) Option {
 	}
 }
 
+// WithAutoLogin enables automatic re-authentication after reconnection.
+func WithAutoLogin(credentials Credentials) Option {
+	return func(opts *Options) {
+		opts.config.autoLogin = NewAutoLogin(credentials)
+	}
+}
+
+// ReconnectionOption configures reconnection behavior.
+type ReconnectionOption func(*tcpClientReconnectionConfig)
+
+// WithMaxRetries sets the maximum number of reconnection attempts.
+// 0 means unlimited retries (default).
+func WithMaxRetries(n uint32) ReconnectionOption {
+	return func(cfg *tcpClientReconnectionConfig) {
+		cfg.maxRetries = n
+	}
+}
+
+// WithRetryInterval sets the delay between reconnection attempts.
+func WithRetryInterval(d time.Duration) ReconnectionOption {
+	return func(cfg *tcpClientReconnectionConfig) {
+		cfg.interval = d
+	}
+}
+
+// WithReestablishAfter sets the minimum time to wait before reconnecting
+// after a previous successful connection.
+func WithReestablishAfter(d time.Duration) ReconnectionOption {
+	return func(cfg *tcpClientReconnectionConfig) {
+		cfg.reestablishAfter = d
+	}
+}
+
+// WithReconnection enables or disables automatic reconnection when disconnected.
+// When enabled, optional ReconnectionOption values can configure max retries,
+// retry interval, and reestablish delay.
+// By default, reconnection is enabled with infinite retries with 2 seconds interval.
+func WithReconnection(enabled bool, reconnOpts ...ReconnectionOption) Option {
+	return func(opts *Options) {
+		opts.config.reconnection.enabled = enabled
+		for _, o := range reconnOpts {
+			o(&opts.config.reconnection)
+		}
+	}
+}
+
 // WithTLSDomain sets the TLS domain for server name indication (SNI).
 // If not provided, the domain will be automatically extracted from the server address.
 func WithTLSDomain(domain string) TLSOption {
@@ -250,12 +298,48 @@ func (c *IggyTcpClient) write(payload []byte) (int, error) {
 	return totalWritten, nil
 }
 
+func isRetryable(err error) bool {
+	return errors.Is(err, ierror.ErrDisconnected) ||
+		errors.Is(err, ierror.ErrEmptyResponse) ||
+		errors.Is(err, ierror.ErrUnauthenticated) ||
+		errors.Is(err, ierror.ErrStaleClient) ||
+		errors.Is(err, ierror.ErrNotConnected) ||
+		errors.Is(err, ierror.ErrCannotEstablishConnection) ||
+		errors.Is(err, ierror.ErrTcpError)
+}
+
 // do sends the command to the Iggy server and returns the response.
 func (c *IggyTcpClient) do(ctx context.Context, cmd command.Command) ([]byte, error) {
 	data, err := cmd.MarshalBinary()
 	if err != nil {
 		return nil, err
 	}
+
+	result, err := c.sendAndFetchResponse(ctx, data, cmd.Code())
+	if err == nil {
+		return result, nil
+	}
+
+	if !isRetryable(err) {
+		return nil, err
+	}
+
+	if !c.config.reconnection.enabled {
+		return nil, ierror.Disconnected{}
+	}
+
+	_ = c.disconnect()
+
+	c.mtx.Lock()
+	serverAddr := c.currentServerAddress
+	c.mtx.Unlock()
+
+	log.Printf("reconnecting to server %s", serverAddr)
+
+	if err := c.Connect(ctx); err != nil {
+		return nil, err
+	}
+
 	return c.sendAndFetchResponse(ctx, data, cmd.Code())
 }
 
@@ -316,13 +400,13 @@ func (c *IggyTcpClient) sendLocked(message []byte, command command.Code) ([]byte
 	payload := createPayload(message, command)
 	if _, err := c.write(payload); err != nil {
 		c.invalidateConnLocked()
-		return nil, err
+		return nil, fmt.Errorf("%w: %w", ierror.ErrTcpError, err)
 	}
 
 	readBytes, buffer, err := c.read(ResponseInitialBytesLength)
 	if err != nil {
 		c.invalidateConnLocked()
-		return nil, err
+		return nil, fmt.Errorf("%w: %w", ierror.Disconnected{}, err)
 	}
 
 	if readBytes != ResponseInitialBytesLength {
@@ -342,7 +426,7 @@ func (c *IggyTcpClient) sendLocked(message []byte, command command.Code) ([]byte
 	_, buffer, err = c.read(length)
 	if err != nil {
 		c.invalidateConnLocked()
-		return nil, err
+		return nil, fmt.Errorf("%w: %w", ierror.TcpError{}, err)
 	}
 
 	return buffer, nil
@@ -376,95 +460,119 @@ func (c *IggyTcpClient) GetConnectionInfo() *iggcon.ConnectionInfo {
 
 // Connect establishes the TCP connection to the server.
 func (c *IggyTcpClient) Connect(ctx context.Context) error {
-	c.mtx.Lock()
-	switch c.state {
-	case iggcon.StateShutdown:
-		c.mtx.Unlock()
-		return ierror.ErrClientShutdown
-	case iggcon.StateConnected,
-		iggcon.StateAuthenticating,
-		iggcon.StateAuthenticated,
-		iggcon.StateConnecting:
-		c.mtx.Unlock()
-		return nil
-	default:
-		c.state = iggcon.StateConnecting
-	}
-	connectedAt := c.connectedAt
-	c.mtx.Unlock()
-
-	// handle reestablish interval
-	if !connectedAt.IsZero() {
-		now := time.Now()
-		elapsed := now.Sub(connectedAt)
-		interval := c.config.reconnection.reestablishAfter
-
-		if elapsed < interval {
-			remaining := interval - elapsed
-			time.Sleep(remaining)
+	for {
+		c.mtx.Lock()
+		switch c.state {
+		case iggcon.StateShutdown:
+			c.mtx.Unlock()
+			return ierror.ErrClientShutdown
+		case iggcon.StateConnected,
+			iggcon.StateAuthenticating,
+			iggcon.StateAuthenticated,
+			iggcon.StateConnecting:
+			c.mtx.Unlock()
+			return nil
+		default:
+			c.state = iggcon.StateConnecting
 		}
-	}
-	attempts := uint(1)
-	interval := time.Duration(0)
-	if c.config.reconnection.enabled {
-		attempts = uint(c.config.reconnection.maxRetries)
-		interval = c.config.reconnection.interval
-	}
+		connectedAt := c.connectedAt
+		c.mtx.Unlock()
 
-	var conn net.Conn
-	if err := retry.New(
-		retry.Context(ctx),
-		retry.Attempts(attempts),
-		retry.Delay(interval),
-		retry.DelayType(retry.FixedDelay),
-	).Do(
-		func() error {
-			connection, err := (&net.Dialer{}).DialContext(ctx, "tcp", c.currentServerAddress)
-			if err != nil {
-				return ierror.ErrCannotEstablishConnection
+		if !connectedAt.IsZero() {
+			now := time.Now()
+			elapsed := now.Sub(connectedAt)
+			interval := c.config.reconnection.reestablishAfter
+
+			if elapsed < interval {
+				remaining := interval - elapsed
+				time.Sleep(remaining)
 			}
+		}
+		attempts := uint(1)
+		interval := time.Duration(0)
+		if c.config.reconnection.enabled {
+			attempts = uint(c.config.reconnection.maxRetries)
+			interval = c.config.reconnection.interval
+		}
 
-			tc := connection.(*net.TCPConn)
-			_ = tc.SetNoDelay(c.config.noDelay)
+		var conn net.Conn
+		if err := retry.New(
+			retry.Context(ctx),
+			retry.Attempts(attempts),
+			retry.Delay(interval),
+			retry.DelayType(retry.FixedDelay),
+		).Do(
+			func() error {
+				connection, err := (&net.Dialer{}).DialContext(ctx, "tcp", c.currentServerAddress)
+				if err != nil {
+					return ierror.ErrCannotEstablishConnection
+				}
 
+				tc := connection.(*net.TCPConn)
+				_ = tc.SetNoDelay(c.config.noDelay)
+
+				c.mtx.Lock()
+				c.clientAddress = tc.LocalAddr().String()
+				c.mtx.Unlock()
+
+				if !c.config.tlsEnabled {
+					conn = connection
+					return nil
+				}
+
+				tlsConfig, err := c.createTLSConfig()
+				if err != nil {
+					_ = connection.Close()
+					return err
+				}
+
+				tlsConn := tls.Client(connection, tlsConfig)
+				if err := tlsConn.Handshake(); err != nil {
+					_ = connection.Close()
+					return fmt.Errorf("TLS handshake failed: %w", err)
+				}
+
+				conn = tlsConn
+				return nil
+			}); err != nil {
 			c.mtx.Lock()
-			c.clientAddress = tc.LocalAddr().String()
+			c.state = iggcon.StateDisconnected
+			c.mtx.Unlock()
+			return err
+		}
+
+		c.mtx.Lock()
+		c.conn = conn
+		c.state = iggcon.StateConnected
+		c.connectedAt = time.Now()
+		c.mtx.Unlock()
+
+		if c.config.autoLogin.enabled {
+			c.mtx.Lock()
+			c.state = iggcon.StateAuthenticating
+			creds := c.config.autoLogin.credentials
 			c.mtx.Unlock()
 
-			if !c.config.tlsEnabled {
-				conn = connection
-				return nil
+			if creds.username != "" {
+				if _, err := c.loginUser(ctx, creds.username, creds.password); err != nil {
+					return err
+				}
+			} else if creds.personalAccessToken != "" {
+				if _, err := c.loginWithPersonalAccessToken(ctx, creds.personalAccessToken); err != nil {
+					return err
+				}
 			}
-
-			// TLS logic
-			tlsConfig, err := c.createTLSConfig()
+			shouldRedirect, err := c.HandleLeaderRedirection(ctx)
 			if err != nil {
-				_ = connection.Close()
 				return err
 			}
-
-			tlsConn := tls.Client(connection, tlsConfig)
-			if err := tlsConn.Handshake(); err != nil {
-				_ = connection.Close()
-				return fmt.Errorf("TLS handshake failed: %w", err)
+			if shouldRedirect {
+				continue
 			}
+		}
 
-			conn = tlsConn
-			return nil
-		}); err != nil {
-		c.mtx.Lock()
-		c.state = iggcon.StateDisconnected
-		c.mtx.Unlock()
-		// TODO publish event disconnected
-		return err
+		return nil
 	}
-
-	c.mtx.Lock()
-	c.conn = conn
-	c.state = iggcon.StateConnected
-	c.connectedAt = time.Now()
-	c.mtx.Unlock()
-	return nil
 }
 
 func (c *IggyTcpClient) createTLSConfig() (*tls.Config, error) {

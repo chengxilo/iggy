@@ -28,7 +28,7 @@ import (
 	iggcon "github.com/apache/iggy/foreign/go/contracts"
 )
 
-func (c *IggyTcpClient) LoginUser(ctx context.Context, username string, password string) (*iggcon.IdentityInfo, error) {
+func (c *IggyTcpClient) loginUser(ctx context.Context, username string, password string) (*iggcon.IdentityInfo, error) {
 	buffer, err := c.do(ctx, &command.LoginUser{
 		Username: username,
 		Password: password,
@@ -37,7 +37,18 @@ func (c *IggyTcpClient) LoginUser(ctx context.Context, username string, password
 		return nil, err
 	}
 
-	identity := binaryserialization.DeserializeLogInResponse(buffer)
+	c.mtx.Lock()
+	c.state = iggcon.StateAuthenticated
+	c.mtx.Unlock()
+	return binaryserialization.DeserializeLogInResponse(buffer), nil
+}
+
+func (c *IggyTcpClient) LoginUser(ctx context.Context, username string, password string) (*iggcon.IdentityInfo, error) {
+	identity, err := c.loginUser(ctx, username, password)
+	if err != nil {
+		return nil, err
+	}
+
 	shouldRedirect, err := c.HandleLeaderRedirection(ctx)
 	if err != nil {
 		return nil, err
@@ -51,7 +62,7 @@ func (c *IggyTcpClient) LoginUser(ctx context.Context, username string, password
 	return identity, nil
 }
 
-func (c *IggyTcpClient) LoginWithPersonalAccessToken(ctx context.Context, token string) (*iggcon.IdentityInfo, error) {
+func (c *IggyTcpClient) loginWithPersonalAccessToken(ctx context.Context, token string) (*iggcon.IdentityInfo, error) {
 	buffer, err := c.do(ctx, &command.LoginWithPersonalAccessToken{
 		Token: token,
 	})
@@ -59,7 +70,18 @@ func (c *IggyTcpClient) LoginWithPersonalAccessToken(ctx context.Context, token 
 		return nil, err
 	}
 
-	identity := binaryserialization.DeserializeLogInResponse(buffer)
+	c.mtx.Lock()
+	c.state = iggcon.StateAuthenticated
+	c.mtx.Unlock()
+	return binaryserialization.DeserializeLogInResponse(buffer), nil
+}
+
+func (c *IggyTcpClient) LoginWithPersonalAccessToken(ctx context.Context, token string) (*iggcon.IdentityInfo, error) {
+	identity, err := c.loginWithPersonalAccessToken(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
 	shouldRedirect, err := c.HandleLeaderRedirection(ctx)
 	if err != nil {
 		return nil, err
