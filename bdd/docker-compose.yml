@@ -177,6 +177,24 @@ services:
     networks:
       - iggy-bdd-network
 
+  # iptables sidecar for reconnection tests.  Shares iggy-server's
+  # network namespace so it can block/unblock traffic to all Iggy
+  # transport ports via its HTTP API on :8475.
+  network-chaos:
+    build:
+      context: ..
+      dockerfile: bdd/network-chaos/Dockerfile
+    network_mode: "service:iggy-server"
+    cap_add:
+      - NET_ADMIN
+    depends_on:
+      iggy-server:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8475/health"]
+      interval: 3s
+      timeout: 2s
+      retries: 5
   rust-bdd:
     build:
       context: ..
@@ -232,13 +250,17 @@ services:
         condition: service_healthy
       iggy-follower:
         condition: service_healthy
+      network-chaos:
+        condition: service_healthy
     environment:
       - IGGY_ROOT_USERNAME=iggy
       - IGGY_ROOT_PASSWORD=iggy
       - IGGY_TCP_ADDRESS=iggy-server:8090
+      - IGGY_CHAOS_API_ADDRESS=http://iggy-server:8475
       - GO_TEST_EXTRA_FLAGS=${GO_TEST_EXTRA_FLAGS:-}
     volumes:
       - ./scenarios/basic_messaging.feature:/app/features/basic_messaging.feature
+      - ./scenarios/tcp_reconnection.feature:/app/features/tcp_reconnection.feature
     command: [ "sh", "-c", "go test -v ${GO_TEST_EXTRA_FLAGS} ./..." ]
     networks:
       - iggy-bdd-network
