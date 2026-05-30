@@ -38,6 +38,13 @@ func TestFeatures(t *testing.T) {
 			Paths:    []string{"../../scenarios/leader_redirection.feature"},
 			TestingT: t,
 		},
+	}, {
+		ScenarioInitializer: initReconnectionScenario,
+		Options: &godog.Options{
+			Format:   "pretty",
+			Paths:    []string{"../../scenarios/tcp_reconnection.feature"},
+			TestingT: t,
+		},
 	}}
 	for _, s := range suites {
 		if s.Run() != 0 {
