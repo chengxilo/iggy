@@ -16,10 +16,14 @@
  * under the License.
  */
 
-pub mod auth;
-pub mod leader_redirection;
-pub mod messages;
-pub mod reconnection;
-pub mod server;
-pub mod streams;
-pub mod topics;
+pub(crate) mod common;
+pub(crate) mod helpers;
+pub(crate) mod steps;
+
+use crate::common::reconnect_context::ReconnectContext;
+use cucumber::World;
+
+#[tokio::main]
+async fn main() {
+    ReconnectContext::run("../../bdd/scenarios/tcp_reconnection.feature").await;
+}

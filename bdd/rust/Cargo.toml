@@ -30,6 +30,9 @@ bdd = []
 bytes = { workspace = true }
 cucumber = { workspace = true }
 iggy = { workspace = true }
+iggy_common = { workspace = true }
+reqwest = { workspace = true }
+secrecy = { workspace = true }
 tokio = { workspace = true }
 
 # `test` is set to false because cucumber uses its own test harness, which
@@ -42,5 +45,10 @@ required-features = ["bdd"]
 
 [[test]]
 name = "leader_redirection"
+harness = false
+required-features = ["bdd"]
+
+[[test]]
+name = "tcp_reconnection"
 harness = false
 required-features = ["bdd"]

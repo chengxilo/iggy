@@ -16,10 +16,18 @@
  * under the License.
  */
 
-pub mod auth;
-pub mod leader_redirection;
-pub mod messages;
-pub mod reconnection;
-pub mod server;
-pub mod streams;
-pub mod topics;
+use reqwest::Client;
+
+pub async fn call_chaos(base_url: &str, action: &str) -> Result<(), String> {
+    let url = format!("{base_url}/{action}");
+    let resp = Client::new()
+        .post(&url)
+        .send()
+        .await
+        .map_err(|e| format!("chaos {action}: {e}"))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("chaos {action} returned {}", resp.status()));
+    }
+    Ok(())
+}

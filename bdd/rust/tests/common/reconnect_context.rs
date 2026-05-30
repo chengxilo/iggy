@@ -16,10 +16,26 @@
  * under the License.
  */
 
-pub mod auth;
-pub mod leader_redirection;
-pub mod messages;
-pub mod reconnection;
-pub mod server;
-pub mod streams;
-pub mod topics;
+use cucumber::World;
+use iggy::prelude::{AutoLogin, IggyClient, TcpClientReconnectionConfig};
+
+#[derive(Debug, World)]
+pub struct ReconnectContext {
+    pub server_addr: String,
+    pub chaos_api: String,
+    pub client: Option<IggyClient>,
+    pub reconnection: TcpClientReconnectionConfig,
+    pub auto_login: AutoLogin,
+}
+
+impl Default for ReconnectContext {
+    fn default() -> Self {
+        Self {
+            server_addr: String::new(),
+            chaos_api: String::new(),
+            client: None,
+            reconnection: TcpClientReconnectionConfig::default(),
+            auto_login: AutoLogin::Disabled,
+        }
+    }
+}

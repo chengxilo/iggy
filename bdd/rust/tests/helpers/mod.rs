@@ -16,5 +16,6 @@
  * under the License.
  */
 
+pub mod chaos;
 pub mod cluster;
 pub mod test_data;

@@ -1779,6 +1779,9 @@ dependencies = [
  "bytes",
  "cucumber",
  "iggy",
+ "iggy_common",
+ "reqwest 0.13.4",
+ "secrecy",
  "tokio",
 ]
 
