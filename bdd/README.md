@@ -50,7 +50,7 @@ bdd/
 ../scripts/run-bdd-tests.sh rust
 ../scripts/run-bdd-tests.sh python
 
-# Run only basic_messaging
+# Run only basic_messaging feature for Rust SDK
 ../scripts/run-bdd-tests.sh rust basic_messaging
 
 # Run only leader_redirection
