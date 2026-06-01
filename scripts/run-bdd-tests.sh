@@ -88,7 +88,15 @@ run_suite(){
   if [ "$FEATURE" = "leader_redirection" ]; then
     case "$svc" in
       rust-bdd|go-bdd|csharp-bdd) ;;
-      *) log "  skipping ${svc} (does not support ${FEATURE})"; return 0 ;;
+      *)
+        if [ "$SDK" = "all" ]; then
+          log "⚠️ skipping ${SDK} (does not support ${FEATURE})"
+          return 0
+        else
+          log "❌ ${SDK} does not support feature '${FEATURE}'"
+          return 1
+        fi
+        ;;
     esac
   fi
 
