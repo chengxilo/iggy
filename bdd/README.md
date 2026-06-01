@@ -27,8 +27,8 @@ bdd/
 │   ├── src/test/
 │   └── build.gradle.kts
 ├── docker-compose.yml          # Base: SDK test clients (always included)
-├── docker-compose.server.yml   # Single iggy-server for basic_messaging
-├── docker-compose.cluster.yml  # Leader + follower for leader_redirection
+├── docker-compose.server.yml   # Single iggy-server test setup
+├── docker-compose.cluster.yml  # Leader + follower test setup
 ├── docker-compose.coverage.yml # Coverage collection overlay
 ├── Dockerfile                  # Debug build of Iggy server
 └── README.md
