@@ -52,6 +52,10 @@ func TestFeatures(t *testing.T) {
 		})
 	}
 
+	if len(suites) == 0 {
+		t.Fatalf("unknown BDD_FEATURE=%q", feature)
+	}
+
 	for _, s := range suites {
 		if s.Run() != 0 {
 			t.Fatal("failing feature tests")
