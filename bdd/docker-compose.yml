@@ -66,7 +66,8 @@ services:
       - IGGY_ROOT_USERNAME=iggy
       - IGGY_ROOT_PASSWORD=iggy
       - BDD_FEATURE=${BDD_FEATURE:-all}
-    command: [ "sh", "-c", "go test -v ./..." ]
+      - GO_TEST_EXTRA_FLAGS=${GO_TEST_EXTRA_FLAGS:-}
+    command: [ "sh", "-c", "go test -v ${GO_TEST_EXTRA_FLAGS:-} ./..." ]
     networks:
       - iggy-bdd-network
 

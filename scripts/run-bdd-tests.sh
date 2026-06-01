@@ -35,7 +35,7 @@ log(){ printf "%b\n" "$*"; }
 usage(){
   log "Usage: $0 [--coverage] <sdk> [feature]"
   log ""
-  log "  sdk:     rust | python | go | node | csharp | java | all | clean (default: all)"
+  log "  sdk:     rust | python | go | go-race | node | csharp | java | all | clean (default: all)"
   log "  feature: basic_messaging | leader_redirection | all  (default: all)"
   log ""
   log "Examples:"
@@ -53,7 +53,7 @@ case "$FEATURE" in
     exit 2 ;;
 esac
 
-export DOCKER_BUILDKIT=1 BDD_FEATURE="$FEATURE"
+export DOCKER_BUILDKIT=1 BDD_FEATURE="$FEATURE" GO_TEST_EXTRA_FLAGS="${GO_TEST_EXTRA_FLAGS:-}"
 
 cd "$(dirname "$0")/../bdd"
 
@@ -106,6 +106,10 @@ case "$SDK" in
   rust)     run_suite rust-bdd   "🦀"   "Running Rust BDD tests"   ;;
   python)   run_suite python-bdd "🐍"   "Running Python BDD tests" ;;
   go)       run_suite go-bdd     "🐹"   "Running Go BDD tests"     ;;
+  go-race)
+    export GO_TEST_EXTRA_FLAGS="-race"
+    run_suite go-bdd "🐹⚡" "Running Go BDD tests with data race detector"
+    ;;
   node)     run_suite node-bdd   "🐢🚀" "Running Node BDD tests"   ;;
   csharp)   run_suite csharp-bdd "🔷"   "Running C# BDD tests"     ;;
   java)     run_suite java-bdd   "☕"   "Running Java BDD tests"   ;;
@@ -113,6 +117,8 @@ case "$SDK" in
     run_suite rust-bdd   "🦀"   "Running Rust BDD tests"                       || exit $?
     run_suite python-bdd "🐍"   "Running Python BDD tests"                     || exit $?
     run_suite go-bdd     "🐹"   "Running Go BDD tests"                         || exit $?
+    GO_TEST_EXTRA_FLAGS="-race" \
+    run_suite go-bdd     "🐹⚡" "Running Go BDD tests with data race detector"  || exit $?
     run_suite node-bdd   "🐢🚀" "Running Node BDD tests"                       || exit $?
     run_suite csharp-bdd "🔷"   "Running C# BDD tests"                         || exit $?
     run_suite java-bdd   "☕"   "Running Java BDD tests"                       || exit $?

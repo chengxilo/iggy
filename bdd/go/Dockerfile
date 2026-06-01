@@ -53,4 +53,4 @@ COPY bdd/scenarios ./bdd/scenarios
 # Change workdir to bdd/go
 WORKDIR /app/bdd/go
 
-CMD ["sh", "-c", "go test -v ./..."]
+CMD ["sh", "-c", "go test -v ${GO_TEST_EXTRA_FLAGS:-} ./..."]
