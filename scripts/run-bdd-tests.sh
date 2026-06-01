@@ -57,6 +57,13 @@ export DOCKER_BUILDKIT=1 BDD_FEATURE="$FEATURE" GO_TEST_EXTRA_FLAGS="${GO_TEST_E
 
 cd "$(dirname "$0")/../bdd"
 
+ALL_COMPOSE_FILES=(
+  -f docker-compose.yml
+  -f docker-compose.server.yml
+  -f docker-compose.cluster.yml
+  -f docker-compose.coverage.yml
+)
+
 COMPOSE_FILES=(-f docker-compose.yml)
 case "$FEATURE" in
   basic_messaging|leader_redirection|all)
@@ -73,7 +80,7 @@ fi
 
 cleanup(){
   log "🧹  cleaning up containers & volumes…"
-  docker compose "${COMPOSE_FILES[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
+  docker compose "${ALL_COMPOSE_FILES[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
 }
 trap cleanup EXIT INT TERM
 
@@ -132,9 +139,7 @@ case "$SDK" in
     run_suite java-bdd   "☕"   "Running Java BDD tests"                       || exit $?
     ;;
   clean)
-    log "🧹  cleaning up all BDD containers & volumes..."
-    docker compose -f docker-compose.yml -f docker-compose.server.yml -f docker-compose.cluster.yml -f docker-compose.coverage.yml \
-      down -v --remove-orphans >/dev/null 2>&1 || true
+    cleanup
     exit 0 ;;
   *)
     log "❌ Unknown SDK: ${SDK}"
