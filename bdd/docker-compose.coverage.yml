@@ -31,7 +31,7 @@ services:
       - |
         rustup component add llvm-tools-preview \
         && cargo install cargo-llvm-cov \
-        && case "$BDD_FEATURE" in
+        && case "$$BDD_FEATURE" in
           basic_messaging)    cargo llvm-cov test -p bdd --features bdd --test basic_messaging --lcov --output-path /reports/rust-bdd-coverage.lcov ;;
           leader_redirection) cargo llvm-cov test -p bdd --features bdd --test leader_redirection --lcov --output-path /reports/rust-bdd-coverage.lcov ;;
           *)                  cargo llvm-cov test -p bdd --features bdd --lcov --output-path /reports/rust-bdd-coverage.lcov ;;
@@ -77,7 +77,7 @@ services:
       - -c
       - |
         FILTER=""
-        case "$BDD_FEATURE" in
+        case "$$BDD_FEATURE" in
           basic_messaging)    FILTER='--filter-trait Category=basic-messaging' ;;
           leader_redirection) FILTER='--filter-trait Category=requires-leader-awareness' ;;
         esac

@@ -34,7 +34,7 @@ services:
       - sh
       - -c
       - |
-        case "$BDD_FEATURE" in
+        case "$$BDD_FEATURE" in
           basic_messaging)    cargo test -p bdd --features bdd --test basic_messaging ;;
           leader_redirection) cargo test -p bdd --features bdd --test leader_redirection ;;
           *)                  cargo test -p bdd --features bdd ;;
@@ -97,7 +97,7 @@ services:
       - -c
       - |
         FILTER=""
-        case "$BDD_FEATURE" in
+        case "$$BDD_FEATURE" in
           basic_messaging)    FILTER='--filter-trait Category=basic-messaging' ;;
           leader_redirection) FILTER='--filter-trait Category=requires-leader-awareness' ;;
         esac
