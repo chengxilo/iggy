@@ -78,8 +78,8 @@ services:
       - |
         FILTER=""
         case "$BDD_FEATURE" in
-          basic_messaging)    FILTER='--filter Category=basic-messaging' ;;
-          leader_redirection) FILTER='--filter Category=requires-leader-awareness' ;;
+          basic_messaging)    FILTER='--filter-trait Category=basic-messaging' ;;
+          leader_redirection) FILTER='--filter-trait Category=requires-leader-awareness' ;;
         esac
         dotnet test $$FILTER --coverage --coverage-output-format cobertura --coverage-output csharp-bdd-coverage.cobertura.xml --results-directory /reports
 

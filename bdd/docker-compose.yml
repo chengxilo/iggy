@@ -96,11 +96,12 @@ services:
       - sh
       - -c
       - |
+        FILTER=""
         case "$BDD_FEATURE" in
-          basic_messaging)    dotnet test --filter "Category=basic-messaging" ;;
-          leader_redirection) dotnet test --filter "Category=requires-leader-awareness" ;;
-          *)                  dotnet test ;;
+          basic_messaging)    FILTER='--filter-trait Category=basic-messaging' ;;
+          leader_redirection) FILTER='--filter-trait Category=requires-leader-awareness' ;;
         esac
+        dotnet test $$FILTER
     networks:
       - iggy-bdd-network
 
