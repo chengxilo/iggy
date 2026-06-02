@@ -97,7 +97,7 @@ run_suite(){
       rust-bdd|go-bdd|csharp-bdd) ;;
       *)
         if [ "$SDK" = "all" ]; then
-          log "⚠️ skipping ${SDK} (does not support ${FEATURE})"
+          log "⚠️ skipping ${svc%-bdd} (does not support ${FEATURE})"
           return 0
         else
           log "❌ ${SDK} does not support feature '${FEATURE}'"
