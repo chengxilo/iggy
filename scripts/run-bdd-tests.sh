@@ -122,6 +122,9 @@ case "$SDK" in
   python)   run_suite python-bdd "🐍"   "Running Python BDD tests" ;;
   go)       run_suite go-bdd     "🐹"   "Running Go BDD tests"     ;;
   go-race)
+    if [ "$COVERAGE" = "1" ]; then
+      log "⚠️ coverage collection automatically drops -race flag as coverage does not need -race"
+    fi
     export GO_TEST_EXTRA_FLAGS="-race"
     run_suite go-bdd "🐹⚡" "Running Go BDD tests with data race detector"
     ;;
