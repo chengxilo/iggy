@@ -76,7 +76,7 @@ services:
     command: [ "--fresh", "--with-default-root-credentials", "--replica-id", "0" ]
     healthcheck:
       test: [ "CMD", "/usr/local/bin/iggy", "--tcp-server-address", "127.0.0.1:8091", "ping" ]
-      interval: 20s
+      interval: 5s
       timeout: 3s
       retries: 30
       start_period: 2s
@@ -96,7 +96,7 @@ services:
     command: [ "--fresh", "--with-default-root-credentials", "--follower", "--replica-id", "1" ]
     healthcheck:
       test: [ "CMD", "/usr/local/bin/iggy", "--tcp-server-address", "127.0.0.1:8092", "ping" ]
-      interval: 20s
+      interval: 5s
       timeout: 3s
       retries: 30
       start_period: 2s
