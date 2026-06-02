@@ -20,6 +20,13 @@
 #               ./scripts/run-bdd-tests.sh <sdk> leader_redirection
 #               ./scripts/run-bdd-tests.sh <sdk> all
 
+x-server-bdd-deps: &server-bdd-deps
+  depends_on:
+    iggy-server:
+      condition: service_healthy
+  environment:
+    - IGGY_TCP_ADDRESS=iggy-server:8090
+
 services:
   iggy-server:
     image: iggy-bdd-server
@@ -61,46 +68,22 @@ services:
       - iggy-bdd-network
 
   rust-bdd:
-    depends_on:
-      iggy-server:
-        condition: service_healthy
-    environment:
-      - IGGY_TCP_ADDRESS=iggy-server:8090
+    <<: *server-bdd-deps
 
   python-bdd:
-    depends_on:
-      iggy-server:
-        condition: service_healthy
-    environment:
-      - IGGY_TCP_ADDRESS=iggy-server:8090
+    <<: *server-bdd-deps
 
   go-bdd:
-    depends_on:
-      iggy-server:
-        condition: service_healthy
-    environment:
-      - IGGY_TCP_ADDRESS=iggy-server:8090
+    <<: *server-bdd-deps
 
   node-bdd:
-    depends_on:
-      iggy-server:
-        condition: service_healthy
-    environment:
-      - IGGY_TCP_ADDRESS=iggy-server:8090
+    <<: *server-bdd-deps
 
   csharp-bdd:
-    depends_on:
-      iggy-server:
-        condition: service_healthy
-    environment:
-      - IGGY_TCP_ADDRESS=iggy-server:8090
+    <<: *server-bdd-deps
 
   java-bdd:
-    depends_on:
-      iggy-server:
-        condition: service_healthy
-    environment:
-      - IGGY_TCP_ADDRESS=iggy-server:8090
+    <<: *server-bdd-deps
 
 volumes:
   iggy_data:
