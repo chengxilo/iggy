@@ -110,7 +110,7 @@ run_suite(){
   log "${emoji} ${label}..."
   local code=0
   docker compose "${COMPOSE_FILES[@]}" \
-    up --build --abort-on-container-exit --exit-code-from "$svc" "$svc" \
+    up --build --exit-code-from "$svc" "$svc" \
     || code=$?
   docker compose "${COMPOSE_FILES[@]}" \
     down -v --remove-orphans >/dev/null 2>&1 || true
