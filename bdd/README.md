@@ -25,12 +25,19 @@ bdd/
 │   └── go.sum
 ├── node/                       # Node SDK BDD implementation
 │   └── Dockerfile              # Node BDD test container
+├── go/                         # Go SDK BDD implementation
+│   ├── Dockerfile              # Go BDD test container
+│   └── tests/
 ├── csharp/                     # csharp SDK BDD implementation
 │   └── Dockerfile              # csharp BDD test container
 ├── java/                       # Java SDK BDD implementation
 │   ├── Dockerfile              # Java BDD test container
 │   ├── src/test/
 │   └── build.gradle.kts
+├── php/                        # PHP SDK BDD implementation
+│   ├── Dockerfile              # PHP BDD test container
+│   ├── phpunit.xml.dist
+│   └── tests/
 ├── docker-compose.yml          # Base: SDK test clients (always included)
 ├── docker-compose.server.yml   # Single iggy-server test setup
 ├── docker-compose.cluster.yml  # Leader + follower test setup
@@ -54,6 +61,11 @@ bdd/
 # Run specific SDK tests (all features)
 ../scripts/run-bdd-tests.sh rust
 ../scripts/run-bdd-tests.sh python
+../scripts/run-bdd-tests.sh go
+../scripts/run-bdd-tests.sh node
+../scripts/run-bdd-tests.sh csharp
+../scripts/run-bdd-tests.sh java
+../scripts/run-bdd-tests.sh php
 
 # Run only basic_messaging feature for Rust SDK
 ../scripts/run-bdd-tests.sh rust basic_messaging
@@ -117,6 +129,10 @@ The csharp implementation is located at [foreign/csharp/Iggy_SDK.Tests.BDD](../f
 ### For Java SDK
 
 The Java implementation is located in `java/src/test/`
+
+### For PHP SDK
+
+The PHP implementation is located in `bdd/php/tests/` and runs through PHPUnit.
 
 ### Adding New Scenarios
 

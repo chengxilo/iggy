@@ -35,7 +35,7 @@ log(){ printf "%b\n" "$*"; }
 usage(){
   log "Usage: $0 [--coverage] <sdk> [feature]"
   log ""
-  log "  sdk:     rust | python | go | go-race | node | csharp | java | all | clean (default: all)"
+  log "  sdk:     rust | python | php | go | go-race | node | csharp | java | all | clean (default: all)"
   log "  feature: basic_messaging | leader_redirection | all  (default: all)"
   log ""
   log "Examples:"
@@ -120,6 +120,7 @@ run_suite(){
 case "$SDK" in
   rust)     run_suite rust-bdd   "🦀"   "Running Rust BDD tests"   ;;
   python)   run_suite python-bdd "🐍"   "Running Python BDD tests" ;;
+  php)      run_suite php-bdd    "🐘"   "Running PHP BDD tests"    ;;
   go)       run_suite go-bdd     "🐹"   "Running Go BDD tests"     ;;
   go-race)
     if [ "$COVERAGE" = "1" ]; then
@@ -134,6 +135,7 @@ case "$SDK" in
   all)
     run_suite rust-bdd   "🦀"   "Running Rust BDD tests"                       || exit $?
     run_suite python-bdd "🐍"   "Running Python BDD tests"                     || exit $?
+    run_suite php-bdd    "🐘"   "Running PHP BDD tests"                        || exit $?
     run_suite go-bdd     "🐹"   "Running Go BDD tests"                         || exit $?
     GO_TEST_EXTRA_FLAGS="-race" \
     run_suite go-bdd     "🐹⚡" "Running Go BDD tests with data race detector"  || exit $?
