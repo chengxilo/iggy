@@ -25,9 +25,6 @@ bdd/
 │   └── go.sum
 ├── node/                       # Node SDK BDD implementation
 │   └── Dockerfile              # Node BDD test container
-├── go/                         # Go SDK BDD implementation
-│   ├── Dockerfile              # Go BDD test container
-│   └── tests/
 ├── csharp/                     # csharp SDK BDD implementation
 │   └── Dockerfile              # csharp BDD test container
 ├── java/                       # Java SDK BDD implementation
@@ -52,7 +49,7 @@ bdd/
 
 ```bash
 # Usage: ../scripts/run-bdd-tests.sh [--coverage] <sdk> [feature]
-#   sdk:     rust | python | go | go-race | node | csharp | java | all | clean  (default: all)
+#   sdk:     rust | python | php | go | go-race | node | csharp | java | all | clean  (default: all)
 #   feature: basic_messaging | leader_redirection | all  (default: all)
 
 # Run all features for all SDKs
