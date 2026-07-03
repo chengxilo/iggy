@@ -95,4 +95,40 @@ mod tests {
             .await;
         assert_eq!(result.unwrap(), Some(timeout));
     }
+
+    #[tokio::test]
+    async fn override_does_not_leak_after_with_timeout() {
+        let timeout = IggyDuration::from_str("5s").unwrap();
+        let _: Result<(), IggyError> = async { Ok(()) }.with_timeout(timeout).await;
+        assert!(get_timeout_override().is_none());
+    }
+
+    #[tokio::test]
+    async fn nested_scopes_use_innermost() {
+        let outer = IggyDuration::from_str("10s").unwrap();
+        let inner = IggyDuration::from_str("1s").unwrap();
+        let result: Result<Option<IggyDuration>, IggyError> = async {
+            async { Ok(get_timeout_override()) }
+                .with_timeout(inner)
+                .await
+        }
+        .with_timeout(outer)
+        .await;
+        assert_eq!(result.unwrap(), Some(inner));
+    }
+
+    #[tokio::test]
+    async fn concurrent_tasks_have_independent_overrides() {
+        let t1 = IggyDuration::from_str("1s").unwrap();
+        let t2 = IggyDuration::from_str("5s").unwrap();
+
+        let (h1, h2) = tokio::join!(
+            async { async { Ok(get_timeout_override()) }.with_timeout(t1).await },
+            async { async { Ok(get_timeout_override()) }.with_timeout(t2).await },
+        );
+        let r1: Result<Option<IggyDuration>, IggyError> = h1;
+        let r2: Result<Option<IggyDuration>, IggyError> = h2;
+        assert_eq!(r1.unwrap(), Some(t1));
+        assert_eq!(r2.unwrap(), Some(t2));
+    }
 }

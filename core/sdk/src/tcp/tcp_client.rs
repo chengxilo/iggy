@@ -1279,4 +1279,23 @@ mod tests {
         assert_eq!(session.current_request_id(), 1);
         assert_eq!(session.client_id(), client_id);
     }
+
+    #[cfg(not(feature = "vsr"))]
+    #[tokio::test]
+    async fn per_request_timeout_should_override_disabled_client_timeout() {
+        use crate::request_timeout::WithTimeout;
+        use iggy_common::SystemClient;
+
+        let addr = make_stalling_tcp_server().await;
+        let client = make_tcp_client(addr, "0").await;
+
+        let result = client
+            .ping()
+            .with_timeout(IggyDuration::from_str("10ms").unwrap())
+            .await;
+
+        assert!(matches!(result, Err(IggyError::RequestTimeout(_))));
+        assert_eq!(client.get_state().await, ClientState::Disconnected);
+        assert!(client.stream.lock().await.is_none());
+    }
 }

@@ -592,6 +592,34 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn per_request_timeout_should_override_disabled_client_timeout() {
+        use crate::request_timeout::WithTimeout;
+        use iggy_common::SystemClient;
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        tokio::spawn(async move {
+            let (_stream, _) = listener.accept().await.unwrap();
+            std::future::pending::<()>().await;
+        });
+
+        let config = Arc::new(HttpClientConfig {
+            api_url: format!("http://{addr}"),
+            request_timeout: IggyDuration::from_str("0").unwrap(),
+            retries: 0,
+            ..Default::default()
+        });
+        let client = HttpClient::create(config).unwrap();
+        let result = client
+            .ping()
+            .with_timeout(IggyDuration::from_str("10ms").unwrap())
+            .await;
+
+        assert!(matches!(result, Err(IggyError::RequestTimeout(_))));
+    }
+
+    #[tokio::test]
     async fn should_not_timeout_when_request_timeout_is_zero() {
         use tokio::io::AsyncWriteExt;
 
