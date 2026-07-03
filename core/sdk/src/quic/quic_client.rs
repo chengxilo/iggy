@@ -655,7 +655,8 @@ impl QuicClient {
 
         let connection = self.connection.clone();
         let response_buffer_size = self.config.response_buffer_size;
-        let request_timeout = self.config.request_timeout;
+        let request_timeout =
+            crate::request_timeout::get_timeout_override().unwrap_or(self.config.request_timeout);
         #[cfg(feature = "vsr")]
         let consensus_session = self.consensus_session.clone();
         let result = tokio::spawn(async move {

@@ -50,6 +50,7 @@ pub struct HttpClient {
     /// The URL of the Iggy API.
     pub api_url: Url,
     pub(crate) heartbeat_interval: IggyDuration,
+    request_timeout: IggyDuration,
     client: ClientWithMiddleware,
     access_token: IggyRwLock<String>,
     events: (Sender<DiagnosticEvent>, Receiver<DiagnosticEvent>),
@@ -97,13 +98,8 @@ impl HttpTransport for HttpClient {
         let url = self.get_url(path)?;
         self.fail_if_not_authenticated(path).await?;
         let token = self.access_token.read().await;
-        let response = self
-            .client
-            .get(url)
-            .bearer_auth(token.deref())
-            .send()
-            .await
-            .map_err(|_| IggyError::InvalidHttpRequest)?;
+        let request = self.client.get(url).bearer_auth(token.deref());
+        let response = self.send_with_timeout(request).await?;
         Self::handle_response(response).await
     }
 
@@ -116,14 +112,8 @@ impl HttpTransport for HttpClient {
         let url = self.get_url(path)?;
         self.fail_if_not_authenticated(path).await?;
         let token = self.access_token.read().await;
-        let response = self
-            .client
-            .get(url)
-            .bearer_auth(token.deref())
-            .query(query)
-            .send()
-            .await
-            .map_err(|_| IggyError::InvalidHttpRequest)?;
+        let request = self.client.get(url).bearer_auth(token.deref()).query(query);
+        let response = self.send_with_timeout(request).await?;
         Self::handle_response(response).await
     }
 
@@ -136,14 +126,12 @@ impl HttpTransport for HttpClient {
         let url = self.get_url(path)?;
         self.fail_if_not_authenticated(path).await?;
         let token = self.access_token.read().await;
-        let response = self
+        let request = self
             .client
             .post(url)
             .bearer_auth(token.deref())
-            .json(payload)
-            .send()
-            .await
-            .map_err(|_| IggyError::InvalidHttpRequest)?;
+            .json(payload);
+        let response = self.send_with_timeout(request).await?;
         Self::handle_response(response).await
     }
 
@@ -156,14 +144,12 @@ impl HttpTransport for HttpClient {
         let url = self.get_url(path)?;
         self.fail_if_not_authenticated(path).await?;
         let token = self.access_token.read().await;
-        let response = self
+        let request = self
             .client
             .put(url)
             .bearer_auth(token.deref())
-            .json(payload)
-            .send()
-            .await
-            .map_err(|_| IggyError::InvalidHttpRequest)?;
+            .json(payload);
+        let response = self.send_with_timeout(request).await?;
         Self::handle_response(response).await
     }
 
@@ -172,13 +158,8 @@ impl HttpTransport for HttpClient {
         let url = self.get_url(path)?;
         self.fail_if_not_authenticated(path).await?;
         let token = self.access_token.read().await;
-        let response = self
-            .client
-            .delete(url)
-            .bearer_auth(token.deref())
-            .send()
-            .await
-            .map_err(|_| IggyError::InvalidHttpRequest)?;
+        let request = self.client.delete(url).bearer_auth(token.deref());
+        let response = self.send_with_timeout(request).await?;
         Self::handle_response(response).await
     }
 
@@ -191,14 +172,12 @@ impl HttpTransport for HttpClient {
         let url = self.get_url(path)?;
         self.fail_if_not_authenticated(path).await?;
         let token = self.access_token.read().await;
-        let response = self
+        let request = self
             .client
             .delete(url)
             .bearer_auth(token.deref())
-            .query(query)
-            .send()
-            .await
-            .map_err(|_| IggyError::InvalidHttpRequest)?;
+            .query(query);
+        let response = self.send_with_timeout(request).await?;
         Self::handle_response(response).await
     }
 
@@ -216,10 +195,7 @@ impl HttpTransport for HttpClient {
         if let Some(body) = body {
             request = request.body(body);
         }
-        let response = request
-            .send()
-            .await
-            .map_err(|_| IggyError::InvalidHttpRequest)?;
+        let response = self.send_with_timeout(request).await?;
         let response = Self::handle_response(response).await?;
         response
             .bytes()
@@ -281,6 +257,23 @@ impl HttpTransport for HttpClient {
 }
 
 impl HttpClient {
+    async fn send_with_timeout(
+        &self,
+        request: reqwest_middleware::RequestBuilder,
+    ) -> Result<Response, IggyError> {
+        let timeout =
+            crate::request_timeout::get_timeout_override().unwrap_or(self.request_timeout);
+        let send = request.send();
+        if timeout.is_zero() {
+            send.await.map_err(|_| IggyError::InvalidHttpRequest)
+        } else {
+            tokio::time::timeout(timeout.get_duration(), send)
+                .await
+                .map_err(|_| IggyError::RequestTimeout(timeout))?
+                .map_err(|_| IggyError::InvalidHttpRequest)
+        }
+    }
+
     /// Create a new HTTP client for interacting with the Iggy API using the provided API URL.
     pub fn new(api_url: &str) -> Result<Self, IggyError> {
         Self::create(Arc::new(HttpClientConfig {
@@ -294,10 +287,7 @@ impl HttpClient {
         validate_api_url(&config.api_url)?;
         let api_url = Url::parse(&config.api_url).map_err(|_| IggyError::CannotParseUrl)?;
         let retry_policy = ExponentialBackoff::builder().build_with_max_retries(config.retries);
-        let mut reqwest_builder = reqwest::Client::builder();
-        if !config.request_timeout.is_zero() {
-            reqwest_builder = reqwest_builder.timeout(config.request_timeout.get_duration());
-        }
+        let reqwest_builder = reqwest::Client::builder();
         let client = ClientBuilder::new(
             reqwest_builder
                 .build()
@@ -313,6 +303,7 @@ impl HttpClient {
             api_url,
             client,
             heartbeat_interval: IggyDuration::from_str("5s").unwrap(),
+            request_timeout: config.request_timeout,
             access_token: IggyRwLock::new(access_token),
             events: broadcast(1000),
         })

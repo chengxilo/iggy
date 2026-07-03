@@ -24,6 +24,7 @@ pub mod http;
 mod leader_aware;
 pub mod prelude;
 pub mod quic;
+pub mod request_timeout;
 pub mod session;
 pub mod stream_builder;
 pub mod tcp;

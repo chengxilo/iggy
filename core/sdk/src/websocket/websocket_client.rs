@@ -787,12 +787,14 @@ impl WebSocketClient {
                 }
             };
 
-            if self.config.request_timeout.is_zero() {
+            let request_timeout = crate::request_timeout::get_timeout_override()
+                .unwrap_or(self.config.request_timeout);
+            if request_timeout.is_zero() {
                 io.await
             } else {
-                match tokio::time::timeout(self.config.request_timeout.get_duration(), io).await {
+                match tokio::time::timeout(request_timeout.get_duration(), io).await {
                     Ok(result) => result,
-                    Err(_) => Err(IggyError::RequestTimeout(self.config.request_timeout)),
+                    Err(_) => Err(IggyError::RequestTimeout(request_timeout)),
                 }
             }
         };

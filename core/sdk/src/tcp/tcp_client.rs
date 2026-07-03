@@ -687,7 +687,8 @@ impl TcpClient {
         }
 
         let stream = self.stream.clone();
-        let request_timeout = self.config.request_timeout;
+        let request_timeout =
+            crate::request_timeout::get_timeout_override().unwrap_or(self.config.request_timeout);
         #[cfg(feature = "vsr")]
         let consensus_session = self.consensus_session.clone();
         let result = tokio::spawn(async move {
