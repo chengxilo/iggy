@@ -30,41 +30,42 @@ import (
 )
 
 func (c *IggyTcpClient) LoginUser(ctx context.Context, username string, password string) (*iggcon.IdentityInfo, error) {
-	c.logger.Info("Iggy client is signing in...", slog.String("client_address", c.clientAddress))
-	buffer, err := c.do(ctx, &command.LoginUser{
+	return c.login(ctx, &command.LoginUser{
 		Username: username,
 		Password: password,
 	})
-	if err != nil {
-		return nil, err
-	}
-
-	c.logger.Info("Iggy client has signed in successfully.", slog.String("client_address", c.clientAddress))
-	identity := binaryserialization.DeserializeLogInResponse(buffer)
-	shouldRedirect, err := c.HandleLeaderRedirection(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if shouldRedirect {
-		if err = c.Connect(ctx); err != nil {
-			return nil, err
-		}
-		return c.LoginUser(ctx, username, password)
-	}
-	return identity, nil
 }
 
 func (c *IggyTcpClient) LoginWithPersonalAccessToken(ctx context.Context, token string) (*iggcon.IdentityInfo, error) {
-	c.logger.Info("Iggy client is signing in...", slog.String("client_address", c.clientAddress))
-	buffer, err := c.do(ctx, &command.LoginWithPersonalAccessToken{
+	return c.login(ctx, &command.LoginWithPersonalAccessToken{
 		Token: token,
 	})
+}
+
+func (c *IggyTcpClient) login(ctx context.Context, loginCmd command.Command) (*iggcon.IdentityInfo, error) {
+	c.logger.Info("Iggy client is signing in...", slog.String("client_address", c.clientAddress))
+	c.mtx.Lock()
+	pre := c.sessionState
+	c.sessionState = iggcon.SessionStateAuthenticating
+	c.mtx.Unlock()
+
+	buffer, err := c.do(ctx, loginCmd)
 	if err != nil {
+		// A rejected login leaves the session state untouched, so restore the
+		// pre-login state only while it is still Authenticating: if the state
+		// moved, the connection may died mid-attempt and invalidation already
+		// recorded it unauthenticated, skip the restoration.
+		c.mtx.Lock()
+		if c.sessionState == iggcon.SessionStateAuthenticating {
+			c.sessionState = pre
+		}
+		c.mtx.Unlock()
 		return nil, err
 	}
 
 	c.logger.Info("Iggy client has signed in successfully.", slog.String("client_address", c.clientAddress))
 	identity := binaryserialization.DeserializeLogInResponse(buffer)
+	c.setSessionState(iggcon.SessionStateAuthenticated)
 	shouldRedirect, err := c.HandleLeaderRedirection(ctx)
 	if err != nil {
 		return nil, err
@@ -73,14 +74,17 @@ func (c *IggyTcpClient) LoginWithPersonalAccessToken(ctx context.Context, token 
 		if err = c.Connect(ctx); err != nil {
 			return nil, err
 		}
-		return c.LoginWithPersonalAccessToken(ctx, token)
+		return c.login(ctx, loginCmd)
 	}
 	return identity, nil
 }
 
 func (c *IggyTcpClient) LogoutUser(ctx context.Context) error {
-	_, err := c.do(ctx, &command.LogoutUser{})
-	return err
+	if _, err := c.do(ctx, &command.LogoutUser{}); err != nil {
+		return err
+	}
+	c.setSessionState(iggcon.SessionStateUnauthenticated)
+	return nil
 }
 
 func (c *IggyTcpClient) HandleLeaderRedirection(ctx context.Context) (bool, error) {

@@ -42,9 +42,10 @@ func newTestClient(t *testing.T) (*IggyTcpClient, net.Conn) {
 	t.Helper()
 	serverConn, clientConn := net.Pipe()
 	c := &IggyTcpClient{
-		conn:   clientConn,
-		state:  iggcon.StateConnected,
-		logger: slog.New(slog.DiscardHandler),
+		conn:           clientConn,
+		transportState: iggcon.TransportStateConnected,
+		sessionState:   iggcon.SessionStateUnauthenticated,
+		logger:         slog.New(slog.DiscardHandler),
 	}
 	t.Cleanup(func() {
 		err := clientConn.Close()
@@ -130,8 +131,8 @@ func TestSendAndFetchResponse_DeadlineTimeout(t *testing.T) {
 		t.Errorf("got %v, want context.DeadlineExceeded", err)
 	}
 	// After a timeout, the connection should be invalidated.
-	if c.state != iggcon.StateDisconnected {
-		t.Errorf("expected state %v, got %v", iggcon.StateDisconnected, c.state)
+	if c.transportState != iggcon.TransportStateDisconnected {
+		t.Errorf("expected state %v, got %v", iggcon.TransportStateDisconnected, c.transportState)
 	}
 
 	// TODO: revisit after reconnect implementation
@@ -158,8 +159,8 @@ func TestSendAndFetchResponse_CancelDuringIO(t *testing.T) {
 		t.Errorf("got %v, want context.Canceled", err)
 	}
 	// Connection should be invalidated after the I/O error.
-	if c.state != iggcon.StateDisconnected {
-		t.Errorf("expected state %v, got %v", iggcon.StateDisconnected, c.state)
+	if c.transportState != iggcon.TransportStateDisconnected {
+		t.Errorf("expected state %v, got %v", iggcon.TransportStateDisconnected, c.transportState)
 	}
 }
 
@@ -214,8 +215,8 @@ func TestSendAndFetchResponse_ErrorStatus(t *testing.T) {
 		t.Errorf("got %v, want %v", err, ierror.ErrUnauthenticated)
 	}
 	// Connection should remain healthy after an application-level error.
-	if c.state != iggcon.StateConnected {
-		t.Errorf("expected state %v, got %v", iggcon.StateConnected, c.state)
+	if c.transportState != iggcon.TransportStateConnected {
+		t.Errorf("expected state %v, got %v", iggcon.TransportStateConnected, c.transportState)
 	}
 }
 
@@ -231,8 +232,8 @@ func TestSendAndFetchResponse_SuccessEmptyBody(t *testing.T) {
 	if len(result) != 0 {
 		t.Errorf("expected empty result, got %d bytes", len(result))
 	}
-	if c.state != iggcon.StateConnected {
-		t.Errorf("expected state %v, got %v", iggcon.StateConnected, c.state)
+	if c.transportState != iggcon.TransportStateConnected {
+		t.Errorf("expected state %v, got %v", iggcon.TransportStateConnected, c.transportState)
 	}
 }
 
@@ -249,8 +250,8 @@ func TestSendAndFetchResponse_SuccessWithBody(t *testing.T) {
 	if string(result) != string(body) {
 		t.Errorf("got %q, want %q", result, body)
 	}
-	if c.state != iggcon.StateConnected {
-		t.Errorf("expected state %v, got %v", iggcon.StateConnected, c.state)
+	if c.transportState != iggcon.TransportStateConnected {
+		t.Errorf("expected state %v, got %v", iggcon.TransportStateConnected, c.transportState)
 	}
 }
 
@@ -270,5 +271,25 @@ func TestNewIggyTcpClient_StoresProvidedLogger(t *testing.T) {
 	}
 	if !strings.Contains(output, "source=tcp") {
 		t.Errorf("expected logger output to contain 'source=tcp', got: %q", output)
+	}
+}
+
+func TestLoginUser_RejectedReloginKeepsExistingSession(t *testing.T) {
+	c, serverConn := newTestClient(t)
+	c.sessionState = iggcon.SessionStateAuthenticated
+
+	go serverRespond(t, serverConn, uint32(ierror.InvalidCredentialsCode), nil)
+
+	_, err := c.LoginUser(context.Background(), "other-user", "wrong-password")
+	if err == nil {
+		t.Fatal("expected login error, got nil")
+	}
+	if !errors.Is(err, ierror.ErrInvalidCredentials) {
+		t.Errorf("got %v, want %v", err, ierror.ErrInvalidCredentials)
+	}
+	// The server rejects the login before touching the existing session,
+	// so the client must keep reporting the session it still has.
+	if c.sessionState != iggcon.SessionStateAuthenticated {
+		t.Errorf("expected session to stay authenticated after rejected relogin, got %v", c.sessionState)
 	}
 }
