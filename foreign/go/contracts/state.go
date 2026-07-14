@@ -45,7 +45,6 @@ type SessionState uint8
 
 const (
 	SessionStateUnauthenticated SessionState = iota
-	SessionStateAuthenticating
 	SessionStateAuthenticated
 )
 
@@ -53,8 +52,6 @@ func (s SessionState) String() string {
 	switch s {
 	case SessionStateUnauthenticated:
 		return "unauthenticated"
-	case SessionStateAuthenticating:
-		return "authenticating"
 	case SessionStateAuthenticated:
 		return "authenticated"
 	default:

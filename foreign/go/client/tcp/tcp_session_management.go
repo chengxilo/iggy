@@ -44,22 +44,12 @@ func (c *IggyTcpClient) LoginWithPersonalAccessToken(ctx context.Context, token 
 
 func (c *IggyTcpClient) login(ctx context.Context, loginCmd command.Command) (*iggcon.IdentityInfo, error) {
 	c.logger.Info("Iggy client is signing in...", slog.String("client_address", c.clientAddress))
-	c.mtx.Lock()
-	pre := c.sessionState
-	c.sessionState = iggcon.SessionStateAuthenticating
-	c.mtx.Unlock()
 
+	// A failed login never writes the session state: a server-side reject
+	// leaves the existing session untouched, and a connection that dies
+	// mid-attempt is already reset to unauthenticated by invalidateConnLocked.
 	buffer, err := c.do(ctx, loginCmd)
 	if err != nil {
-		// A rejected login leaves the session state untouched, so restore the
-		// pre-login state only while it is still Authenticating: if the state
-		// moved, the connection may died mid-attempt and invalidation already
-		// recorded it unauthenticated, skip the restoration.
-		c.mtx.Lock()
-		if c.sessionState == iggcon.SessionStateAuthenticating {
-			c.sessionState = pre
-		}
-		c.mtx.Unlock()
 		return nil, err
 	}
 

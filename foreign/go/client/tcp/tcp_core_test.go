@@ -274,6 +274,39 @@ func TestNewIggyTcpClient_StoresProvidedLogger(t *testing.T) {
 	}
 }
 
+func TestLoginUser_LoginAndLogout(t *testing.T) {
+	c, serverConn := newTestClient(t)
+
+	identity := make([]byte, 4)
+	binary.LittleEndian.PutUint32(identity, 42)
+
+	go func() {
+		serverRespond(t, serverConn, 0, identity)
+		// login always probes for a leader afterwards; it must be answered or the call blocks.
+		serverRespond(t, serverConn, uint32(ierror.FeatureUnavailableCode), nil)
+		serverRespond(t, serverConn, 0, nil)
+	}()
+
+	ctx := context.Background()
+	info, err := c.LoginUser(ctx, "iggy", "iggy")
+	if err != nil {
+		t.Fatalf("unexpected login error: %v", err)
+	}
+	if info.UserId != 42 {
+		t.Errorf("got user id %d, want 42", info.UserId)
+	}
+	if c.sessionState != iggcon.SessionStateAuthenticated {
+		t.Errorf("expected session %v after login, got %v", iggcon.SessionStateAuthenticated, c.sessionState)
+	}
+
+	if err := c.LogoutUser(ctx); err != nil {
+		t.Fatalf("unexpected logout error: %v", err)
+	}
+	if c.sessionState != iggcon.SessionStateUnauthenticated {
+		t.Errorf("expected session %v after logout, got %v", iggcon.SessionStateUnauthenticated, c.sessionState)
+	}
+}
+
 func TestLoginUser_RejectedReloginKeepsExistingSession(t *testing.T) {
 	c, serverConn := newTestClient(t)
 	c.sessionState = iggcon.SessionStateAuthenticated
