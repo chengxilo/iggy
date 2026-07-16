@@ -32,7 +32,8 @@ use consensus::{
 };
 use iggy_binary_protocol::{
     Command2, CommitHeader, DoViewChangeHeader, GenericHeader, Operation, PrepareHeader,
-    PrepareOkHeader, RequestHeader, StartViewChangeHeader, StartViewHeader,
+    PrepareOkHeader, RepairPrepareHeader, RepairRangeReplyHeader, RequestHeader,
+    RequestPreparesHeader, RequestStartViewHeader, StartViewChangeHeader, StartViewHeader,
 };
 #[cfg(any(test, feature = "simulator"))]
 use iggy_common::PartitionStats;
@@ -664,6 +665,26 @@ impl ShardFrame {
     }
 }
 
+/// Prepares served per `RequestPrepares` round. The per-peer bus queues
+/// are bounded (`peer_queue_capacity`, 256 by default) and overrun frames
+/// drop silently, so an unbounded burst loses its own tail; the receiver
+/// pulls the window chunk by chunk instead (each walked `RepairDone`
+/// immediately requests the next chunk while progress holds).
+const REPAIR_CHUNK_MAX: u64 = 128;
+
+/// One in-flight metadata journal-repair stream (shard 0 only).
+#[derive(Debug, Clone, Copy)]
+struct MetadataRepairSession {
+    nonce: u128,
+    to_op: u64,
+    /// Re-request target on stall.
+    peer: u8,
+    /// Ticks since the stream last made progress; at
+    /// [`partitions::REPAIR_RETRY_TICKS`] the remaining window is
+    /// re-requested from `peer`.
+    idle_ticks: u32,
+}
+
 pub struct IggyShard<B, MJ, S, M, T = ()>
 where
     B: MessageBus,
@@ -685,6 +706,12 @@ where
     /// Callback attached to every delegated client connection installed on
     /// this shard. Invoked for each inbound `Request` frame.
     on_client_request: RequestHandler,
+
+    /// In-flight metadata journal repair: set when the recovery
+    /// handshake finds this replica's WAL behind the group frontier, cleared
+    /// at `RepairDone`. Metadata never needs a commit floor -- its WAL keeps
+    /// the full prefix -- so only the stream identity is tracked.
+    metadata_repair: RefCell<Option<MetadataRepairSession>>,
 
     /// Handler for inbound [`MetadataSubmit`] frames. Only shard 0 receives
     /// these (it owns the metadata consensus group); peers send them here
@@ -832,6 +859,7 @@ where
             metadata_tick_handler: RefCell::new(None),
             reconcile_queue: RefCell::new(VecDeque::new()),
             pending_partition_frames: RefCell::new(HashMap::new()),
+            metadata_repair: RefCell::new(None),
         })
     }
 
@@ -1041,6 +1069,7 @@ where
             metadata_tick_handler: RefCell::new(None),
             reconcile_queue: RefCell::new(VecDeque::new()),
             pending_partition_frames: RefCell::new(HashMap::new()),
+            metadata_repair: RefCell::new(None),
         }
     }
 
@@ -1337,6 +1366,10 @@ where
             Ok(MessageBag::DoViewChange(msg)) => self.on_do_view_change(msg).await,
             Ok(MessageBag::StartView(msg)) => self.on_start_view(msg).await,
             Ok(MessageBag::Commit(ref msg)) => self.on_commit(msg).await,
+            Ok(MessageBag::RequestStartView(ref msg)) => self.on_request_start_view(msg).await,
+            Ok(MessageBag::RequestPrepares(ref msg)) => self.on_request_prepares(msg).await,
+            Ok(MessageBag::RepairPrepare(msg)) => self.on_repair_prepare(msg).await,
+            Ok(MessageBag::RepairRangeReply(ref msg)) => self.on_repair_range_reply(msg).await,
             Err(e) => {
                 tracing::warn!(shard = self.id, error = %e, "dropping message with invalid command");
             }
@@ -1752,6 +1785,40 @@ where
             {
                 planes.0.commit_journal().await;
             }
+            // Adoption can leave this replica knowing a frontier its WAL
+            // cannot reach (StartView carries numbers, not entries): the
+            // walk above gap-stops. Fill the hole through journal repair
+            // from the announcing primary.
+            if consensus.is_normal()
+                && consensus.commit_min() < consensus.commit_max()
+                && self.metadata_repair.borrow().is_none()
+            {
+                let nonce = iggy_common::random_id::get_uuid();
+                let to_op = consensus.commit_max();
+                let from_op = consensus.commit_min() + 1;
+                *self.metadata_repair.borrow_mut() = Some(MetadataRepairSession {
+                    nonce,
+                    to_op,
+                    peer: header.replica,
+                    idle_ticks: 0,
+                });
+                tracing::info!(
+                    shard = self.id,
+                    from_op,
+                    to_op,
+                    "metadata behind after StartView adoption; requesting repair"
+                );
+                self.send_request_prepares(
+                    consensus.cluster(),
+                    consensus.replica(),
+                    header.replica,
+                    nonce,
+                    from_op,
+                    to_op,
+                    header.namespace,
+                )
+                .await;
+            }
             return;
         }
 
@@ -1774,6 +1841,38 @@ where
             .any(|action| matches!(action, VsrAction::CommitJournal))
         {
             partition.commit_journal(config).await;
+        }
+        // Same gap-fill as the metadata arm: a journal-less rejoiner that
+        // adopted the new view still lacks the window's entries; repair from
+        // the announcing primary, floor settled by its RangeEvicted.
+        let consensus = partition.consensus();
+        if consensus.is_normal()
+            && consensus.commit_min() < consensus.commit_max()
+            && partition.repair.is_none()
+        {
+            let nonce = iggy_common::random_id::get_uuid();
+            let to_op = consensus.commit_max();
+            let from_op = consensus.commit_min() + 1;
+            let cluster = consensus.cluster();
+            let self_id = consensus.replica();
+            partition.repair = Some(partitions::RepairSession {
+                nonce,
+                to_op,
+                floor: None,
+                peer: header.replica,
+                first_batch_offset: None,
+                idle_ticks: 0,
+            });
+            self.send_request_prepares(
+                cluster,
+                self_id,
+                header.replica,
+                nonce,
+                from_op,
+                to_op,
+                header.namespace,
+            )
+            .await;
         }
     }
 
@@ -1830,6 +1929,551 @@ where
         }
     }
 
+    /// `RequestStartView` probe from a restarted peer: the probed group's
+    /// current primary answers with a `StartView`; a probe from the replica
+    /// that IS the current primary-by-index makes backups elect immediately
+    /// (the consensus handler decides; everyone else stays silent).
+    #[allow(clippy::future_not_send)]
+    async fn on_request_start_view(&self, msg: &Message<RequestStartViewHeader>)
+    where
+        B: MessageBus,
+        MJ: JournalHandle,
+        <MJ as JournalHandle>::Target: Journal<
+                <MJ as JournalHandle>::Storage,
+                Entry = Message<PrepareHeader>,
+                Header = PrepareHeader,
+            >,
+    {
+        let header = *msg.header();
+        let planes = self.plane.inner();
+        if let Some(ref consensus) = planes.0.consensus
+            && consensus.namespace() == header.namespace
+        {
+            let actions = consensus.handle_request_start_view(PlaneKind::Metadata, &header);
+            dispatch_vsr_actions(consensus, planes.0.journal.as_ref(), &actions).await;
+            return;
+        }
+        let Some(partition) = planes
+            .1
+            .0
+            .get_mut_by_ns(&IggyNamespace::from_raw(header.namespace))
+        else {
+            return;
+        };
+        let consensus = partition.consensus();
+        let actions = consensus.handle_request_start_view(PlaneKind::Partitions, &header);
+        dispatch_vsr_actions::<B, _, MJ>(consensus, None, &actions).await;
+    }
+
+    /// Serve a repair range from this replica's journal: stream
+    /// `RepairPrepare` frames (stored prepares verbatim, command byte
+    /// rewritten) in op order, prefixed by `RangeEvicted` when the front of
+    /// the range is no longer retained, terminated by `RepairDone`.
+    #[allow(clippy::future_not_send, clippy::too_many_lines)]
+    async fn on_request_prepares(&self, msg: &Message<RequestPreparesHeader>)
+    where
+        B: MessageBus,
+        MJ: JournalHandle,
+        <MJ as JournalHandle>::Target: Journal<
+                <MJ as JournalHandle>::Storage,
+                Entry = Message<PrepareHeader>,
+                Header = PrepareHeader,
+            >,
+    {
+        let header = *msg.header();
+        let target = header.replica;
+        let planes = self.plane.inner();
+        if let Some(ref consensus) = planes.0.consensus
+            && consensus.namespace() == header.namespace
+        {
+            if !consensus.is_normal() {
+                return;
+            }
+            let Some(journal) = planes.0.journal.as_ref() else {
+                return;
+            };
+            let journal = journal.handle();
+            let cluster = consensus.cluster();
+            let self_id = consensus.replica();
+            let to_op = header.to_op.min(consensus.commit_max());
+            // Skip the compacted prefix (below the snapshot floor) in one
+            // RangeEvicted notice, then serve contiguously until the range
+            // ends or the WAL runs out.
+            let mut from_op = header.from_op;
+            #[allow(clippy::cast_possible_truncation)]
+            while from_op <= to_op && journal.header(from_op as usize).is_none() {
+                from_op += 1;
+            }
+            if from_op > to_op {
+                // Nothing in the requested range is retained. Answer the
+                // eviction honestly: a bare `RepairDone(to_op)` here would
+                // claim full coverage while serving zero prepares, and the
+                // requester would clear its session and gap-stop silently.
+                self.send_repair_range_reply(
+                    cluster,
+                    self_id,
+                    target,
+                    Command2::RangeEvicted,
+                    header.nonce,
+                    from_op,
+                    header.namespace,
+                )
+                .await;
+                self.send_repair_range_reply(
+                    cluster,
+                    self_id,
+                    target,
+                    Command2::RepairDone,
+                    header.nonce,
+                    header.from_op.saturating_sub(1),
+                    header.namespace,
+                )
+                .await;
+                return;
+            }
+            if from_op > header.from_op {
+                self.send_repair_range_reply(
+                    cluster,
+                    self_id,
+                    target,
+                    Command2::RangeEvicted,
+                    header.nonce,
+                    from_op,
+                    header.namespace,
+                )
+                .await;
+            }
+            let chunk_end = to_op.min(from_op.saturating_add(REPAIR_CHUNK_MAX - 1));
+            let mut served_through = from_op.saturating_sub(1);
+            for op in from_op..=chunk_end {
+                #[allow(clippy::cast_possible_truncation)]
+                let Some(entry_header) = journal.header(op as usize).map(|h| *h) else {
+                    break;
+                };
+                let Some(entry) = journal.entry(&entry_header).await else {
+                    break;
+                };
+                if !self
+                    .send_repair_prepare(target, entry.into_generic().into_frozen())
+                    .await
+                {
+                    break;
+                }
+                served_through = op;
+            }
+            self.send_repair_range_reply(
+                cluster,
+                self_id,
+                target,
+                Command2::RepairDone,
+                header.nonce,
+                served_through,
+                header.namespace,
+            )
+            .await;
+            return;
+        }
+        let Some(partition) = planes
+            .1
+            .0
+            .get_mut_by_ns(&IggyNamespace::from_raw(header.namespace))
+        else {
+            return;
+        };
+        if !partition.consensus().is_normal() {
+            return;
+        }
+        let cluster = partition.consensus().cluster();
+        let self_id = partition.consensus().replica();
+        let to_op = header.to_op.min(partition.consensus().commit_max());
+        let retained_from = partition.log.journal().inner.repair_retained_from();
+        let mut from_op = header.from_op;
+        if let Some(retained_from) = retained_from
+            && retained_from > from_op
+        {
+            self.send_repair_range_reply(
+                cluster,
+                self_id,
+                target,
+                Command2::RangeEvicted,
+                header.nonce,
+                retained_from,
+                header.namespace,
+            )
+            .await;
+            from_op = retained_from;
+        }
+        let chunk_end = to_op.min(from_op.saturating_add(REPAIR_CHUNK_MAX - 1));
+        let mut served_through = from_op.saturating_sub(1);
+        for op in from_op..=chunk_end {
+            let Some(entry) = partition.log.journal().inner.repair_entry(op) else {
+                break;
+            };
+            if !self.send_repair_prepare(target, entry).await {
+                break;
+            }
+            served_through = op;
+        }
+        self.send_repair_range_reply(
+            cluster,
+            self_id,
+            target,
+            Command2::RepairDone,
+            header.nonce,
+            served_through,
+            header.namespace,
+        )
+        .await;
+        tracing::info!(
+            shard = self.id,
+            namespace_raw = header.namespace,
+            target,
+            from_op = header.from_op,
+            to_op,
+            served_through,
+            "served partition repair range"
+        );
+    }
+
+    /// Ingest one repaired prepare. Metadata journals it into the WAL (the
+    /// commit walk at `RepairDone` applies it); partitions journal + stage it
+    /// through the same apply path as live replication, minus fence and ack.
+    #[allow(clippy::future_not_send)]
+    async fn on_repair_prepare(&self, msg: Message<RepairPrepareHeader>)
+    where
+        B: MessageBus,
+        MJ: JournalHandle,
+        <MJ as JournalHandle>::Target: Journal<
+                <MJ as JournalHandle>::Storage,
+                Entry = Message<PrepareHeader>,
+                Header = PrepareHeader,
+            >,
+    {
+        tracing::debug!(
+            shard = self.id,
+            op = msg.header().0.op,
+            namespace_raw = msg.header().0.namespace,
+            "repair prepare received"
+        );
+        // Convert to a live-prepare frame exactly once, here at the apply
+        // site (the frame must stay `RepairPrepare` up to this point: the
+        // router round-trips bags through generic bytes, and a live-Prepare
+        // command byte would land the re-parse on the view fence). The
+        // inner layout IS a stored prepare; downstream journal/apply paths
+        // run full prepare validation on it.
+        let msg = msg.transmute_header(|old: RepairPrepareHeader, new: &mut PrepareHeader| {
+            *new = old.0;
+            new.command = Command2::Prepare;
+        });
+        let header = *msg.header();
+        let planes = self.plane.inner();
+        if let Some(ref consensus) = planes.0.consensus
+            && consensus.namespace() == header.namespace
+        {
+            let session = *self.metadata_repair.borrow();
+            let Some(session) = session else {
+                return;
+            };
+            if header.op > session.to_op || header.op <= consensus.commit_min() {
+                return;
+            }
+            let Some(journal) = planes.0.journal.as_ref() else {
+                return;
+            };
+            let journal = journal.handle();
+            #[allow(clippy::cast_possible_truncation)]
+            if journal.header(header.op as usize).is_some() {
+                return;
+            }
+            if let Err(error) = journal.append(msg).await {
+                tracing::warn!(
+                    shard = self.id,
+                    op = header.op,
+                    %error,
+                    "failed to journal repaired metadata prepare"
+                );
+                return;
+            }
+            // Contiguous-frontier advance, mirroring
+            // `apply_repaired_prepare`: DVC advertises the sequencer, so a
+            // hole below a repaired op must stall the advance rather than
+            // mint an election candidate with an unwalkable log.
+            let mut frontier = consensus.sequencer().current_sequence();
+            #[allow(clippy::cast_possible_truncation)]
+            while journal.header((frontier + 1) as usize).is_some() {
+                frontier += 1;
+            }
+            if frontier > consensus.sequencer().current_sequence() {
+                consensus.sequencer().set_sequence(frontier);
+            }
+            consensus.set_last_prepare_checksum(header.checksum);
+            return;
+        }
+        let Some(partition) = planes
+            .1
+            .0
+            .get_mut_by_ns(&IggyNamespace::from_raw(header.namespace))
+        else {
+            return;
+        };
+        partition.apply_repaired_prepare(msg).await;
+    }
+
+    /// Repair stream terminator: `RangeEvicted` settles the partition commit
+    /// floor candidate; `RepairDone` runs the commit walk over the repaired
+    /// window and closes the session.
+    #[allow(clippy::future_not_send, clippy::too_many_lines)]
+    async fn on_repair_range_reply(&self, msg: &Message<RepairRangeReplyHeader>)
+    where
+        B: MessageBus,
+        MJ: JournalHandle,
+        <MJ as JournalHandle>::Target: Journal<
+                <MJ as JournalHandle>::Storage,
+                Entry = Message<PrepareHeader>,
+                Header = PrepareHeader,
+            >,
+        M: StreamsFrontend
+            + StateMachine<
+                Input = Message<PrepareHeader>,
+                Output = metadata::stm::result::ApplyReply,
+                Error = iggy_common::IggyError,
+            >,
+    {
+        let header = *msg.header();
+        let planes = self.plane.inner();
+        if let Some(ref consensus) = planes.0.consensus
+            && consensus.namespace() == header.namespace
+        {
+            let session = *self.metadata_repair.borrow();
+            let Some(session) = session else {
+                return;
+            };
+            if header.nonce != session.nonce {
+                return;
+            }
+            match header.command {
+                Command2::RepairDone => {
+                    let before = consensus.commit_min();
+                    planes.0.commit_journal().await;
+                    // Completion is decided by the LOCAL walk, not the
+                    // peer's served-through claim: repair frames ride a
+                    // lossy best-effort bus, so a fully-served stream can
+                    // still arrive with holes. Anything short keeps the
+                    // session armed; while the walk is making progress the
+                    // next chunk is pulled immediately (the window is served
+                    // in `REPAIR_CHUNK_MAX` slices), and a stalled one is
+                    // left to the retry timer.
+                    let commit_min = consensus.commit_min();
+                    let done = commit_min >= session.to_op;
+                    tracing::info!(
+                        shard = self.id,
+                        through_op = header.op,
+                        commit_min,
+                        done,
+                        "metadata journal repair walked"
+                    );
+                    if done {
+                        *self.metadata_repair.borrow_mut() = None;
+                    } else if commit_min > before {
+                        self.send_request_prepares(
+                            consensus.cluster(),
+                            consensus.replica(),
+                            session.peer,
+                            session.nonce,
+                            commit_min + 1,
+                            session.to_op,
+                            header.namespace,
+                        )
+                        .await;
+                    }
+                }
+                Command2::RangeEvicted => {
+                    // The metadata WAL retains everything above the snapshot
+                    // floor; an evicted range means the peer compacted past
+                    // this replica's gap -- bulk snapshot transfer (phase 3)
+                    // territory. Surface loudly; the divergence backstop
+                    // still guards the walk.
+                    tracing::warn!(
+                        shard = self.id,
+                        retained_from = header.op,
+                        "metadata repair range evicted on the serving peer; \
+                         snapshot transfer required"
+                    );
+                }
+                _ => {}
+            }
+            return;
+        }
+        let config = planes.1.0.config().clone();
+        let Some(partition) = planes
+            .1
+            .0
+            .get_mut_by_ns(&IggyNamespace::from_raw(header.namespace))
+        else {
+            return;
+        };
+        let Some(session) = partition.repair else {
+            return;
+        };
+        if header.nonce != session.nonce {
+            return;
+        }
+        match header.command {
+            Command2::RangeEvicted => {
+                if let Some(repair) = partition.repair.as_mut() {
+                    repair.floor = Some(header.op.saturating_sub(1));
+                }
+            }
+            Command2::RepairDone => {
+                // `complete_repair` walks the window and clears the session
+                // only when the LOCAL commit frontier reached the requested
+                // op (the peer's served-through claim proves nothing about
+                // delivery on a lossy bus). While the walk makes progress
+                // the next chunk is pulled immediately; a stalled window is
+                // left to the retry timer.
+                let before = partition.consensus().commit_min();
+                partition.complete_repair(&config).await;
+                if partition.repair.is_none() {
+                    tracing::info!(
+                        shard = self.id,
+                        namespace_raw = header.namespace,
+                        through_op = header.op,
+                        "partition journal repair complete"
+                    );
+                } else {
+                    let commit_min = partition.consensus().commit_min();
+                    let next = partition.repair.as_ref().and_then(|live| {
+                        (commit_min > before).then_some((live.peer, live.nonce, live.to_op))
+                    });
+                    let cluster = partition.consensus().cluster();
+                    let self_id = partition.consensus().replica();
+                    if let Some((peer, nonce, to_op)) = next {
+                        self.send_request_prepares(
+                            cluster,
+                            self_id,
+                            peer,
+                            nonce,
+                            commit_min + 1,
+                            to_op,
+                            header.namespace,
+                        )
+                        .await;
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Ask `target` to stream its journaled prepares in `[from_op, to_op]`
+    /// for `namespace`; answered by `RepairPrepare` frames terminated with
+    /// `RepairDone` (prefixed by `RangeEvicted` when the front of the range
+    /// is no longer retained).
+    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::future_not_send, clippy::cast_possible_truncation)]
+    async fn send_request_prepares(
+        &self,
+        cluster: u128,
+        self_id: u8,
+        target: u8,
+        nonce: u128,
+        from_op: u64,
+        to_op: u64,
+        namespace: u64,
+    ) where
+        B: MessageBus,
+    {
+        let msg = Message::<RequestPreparesHeader>::new(size_of::<RequestPreparesHeader>())
+            .transmute_header(|_, h: &mut RequestPreparesHeader| {
+                h.command = Command2::RequestPrepares;
+                h.cluster = cluster;
+                h.replica = self_id;
+                h.nonce = nonce;
+                h.from_op = from_op;
+                h.to_op = to_op;
+                h.namespace = namespace;
+                h.size = size_of::<RequestPreparesHeader>() as u32;
+            });
+        if self
+            .bus
+            .send_to_replica(target, msg.into_generic().into_frozen())
+            .await
+            .is_err()
+        {
+            // The stall retry re-requests; without this line a dead peer
+            // channel makes repair look like a silent server-side refusal.
+            tracing::warn!(
+                shard = self.id,
+                target,
+                from_op,
+                to_op,
+                namespace_raw = namespace,
+                "request-prepares send failed; stall retry will re-request"
+            );
+        }
+    }
+
+    /// Send a stored prepare (raw journal bytes) as a `RepairPrepare` frame:
+    /// the command byte is rewritten on an owned copy, because a verbatim
+    /// `Prepare` would hit the live view fence on the receiver while
+    /// `RepairPrepare` routes to the fence-free repair ingest.
+    /// Returns whether the frame was handed to the bus: `send_to_replica`
+    /// is a non-blocking try-send, so under a queue-full burst op N can be
+    /// dropped while N+1 lands. Callers must not advance their
+    /// served-through watermark past a failed send, or the terminating
+    /// `RepairDone` reports ops that were never delivered.
+    #[allow(clippy::future_not_send)]
+    async fn send_repair_prepare(&self, target: u8, entry: Frozen<MESSAGE_ALIGN>) -> bool
+    where
+        B: MessageBus,
+    {
+        const COMMAND_OFFSET: usize = std::mem::offset_of!(GenericHeader, command);
+        let mut owned =
+            server_common::iobuf::Owned::<MESSAGE_ALIGN>::copy_from_slice(entry.as_slice());
+        owned.as_mut_slice()[COMMAND_OFFSET] = Command2::RepairPrepare as u8;
+        let Ok(message) = Message::<GenericHeader>::try_from(owned) else {
+            tracing::warn!(
+                shard = self.id,
+                "repair prepare bytes failed message framing"
+            );
+            return false;
+        };
+        self.bus
+            .send_to_replica(target, message.into_frozen())
+            .await
+            .is_ok()
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::future_not_send, clippy::cast_possible_truncation)]
+    async fn send_repair_range_reply(
+        &self,
+        cluster: u128,
+        self_id: u8,
+        target: u8,
+        command: Command2,
+        nonce: u128,
+        op: u64,
+        namespace: u64,
+    ) where
+        B: MessageBus,
+    {
+        let msg = Message::<RepairRangeReplyHeader>::new(size_of::<RepairRangeReplyHeader>())
+            .transmute_header(|_, h: &mut RepairRangeReplyHeader| {
+                h.command = command;
+                h.cluster = cluster;
+                h.replica = self_id;
+                h.nonce = nonce;
+                h.op = op;
+                h.namespace = namespace;
+                h.size = size_of::<RepairRangeReplyHeader>() as u32;
+            });
+        let _ = self
+            .bus
+            .send_to_replica(target, msg.into_generic().into_frozen())
+            .await;
+    }
+
     /// Tick partition consensuses. Loop partitions. No partitions-plane journal.
     #[allow(clippy::future_not_send)]
     pub async fn tick_partitions(&self)
@@ -1862,6 +2506,61 @@ where
             let actions = consensus.tick(PlaneKind::Partitions);
             dispatch_vsr_actions::<B, _, MJ>(consensus, None, &actions).await;
             dispatch_partition_journal_actions(consensus, partition, &actions).await;
+
+            // Stall retry: repair frames are fire-and-forget, so a lost
+            // frame (or a peer that went silent mid-stream) would leave the
+            // session armed forever with commit_min pinned below commit_max.
+            // Re-request the remaining window from the serving peer; the
+            // ingest path skips duplicates, so overlap is harmless.
+            let stalled = {
+                let Some(partition) = partitions.get_mut_by_ns(&namespace) else {
+                    continue;
+                };
+                let consensus_normal = partition.consensus().is_normal();
+                let commit_min = partition.consensus().commit_min();
+                let cluster = partition.consensus().cluster();
+                let self_id = partition.consensus().replica();
+                partition.repair.as_mut().and_then(|session| {
+                    if !consensus_normal {
+                        return None;
+                    }
+                    session.idle_ticks += 1;
+                    if session.idle_ticks < partitions::REPAIR_RETRY_TICKS {
+                        return None;
+                    }
+                    session.idle_ticks = 0;
+                    Some((
+                        session.peer,
+                        session.nonce,
+                        commit_min + 1,
+                        session.to_op,
+                        cluster,
+                        self_id,
+                    ))
+                })
+            };
+            if let Some((peer, nonce, from_op, to_op, cluster, self_id)) = stalled
+                && from_op <= to_op
+            {
+                tracing::info!(
+                    shard = self.id,
+                    namespace_raw = namespace.inner(),
+                    from_op,
+                    to_op,
+                    peer,
+                    "partition repair stalled; re-requesting remaining window"
+                );
+                self.send_request_prepares(
+                    cluster,
+                    self_id,
+                    peer,
+                    nonce,
+                    from_op,
+                    to_op,
+                    namespace.inner(),
+                )
+                .await;
+            }
         }
     }
 
@@ -1876,6 +2575,11 @@ where
     {
         let partitions = self.plane.partitions();
         let namespaces: Vec<_> = partitions.namespaces().copied().collect();
+        tracing::info!(
+            shard = self.id,
+            partitions = namespaces.len(),
+            "shutdown flush: draining committed journals to segment storage"
+        );
         for namespace in namespaces {
             let Some(partition) = partitions.get_mut_by_ns(&namespace) else {
                 continue;
@@ -1924,6 +2628,45 @@ where
         // forever (commit_min stuck below commit_max). See
         // `IggyMetadata::repair_primary_self_acks`.
         metadata.repair_primary_self_acks().await;
+
+        // Stall retry, mirroring `tick_partitions`: a lost repair frame must
+        // not wedge the session forever.
+        let stalled = {
+            let mut session = self.metadata_repair.borrow_mut();
+            session.as_mut().and_then(|session| {
+                if !consensus.is_normal() {
+                    return None;
+                }
+                session.idle_ticks += 1;
+                if session.idle_ticks < partitions::REPAIR_RETRY_TICKS {
+                    return None;
+                }
+                session.idle_ticks = 0;
+                Some((session.peer, session.nonce, session.to_op))
+            })
+        };
+        if let Some((peer, nonce, to_op)) = stalled {
+            let from_op = consensus.commit_min() + 1;
+            if from_op <= to_op {
+                tracing::info!(
+                    shard = self.id,
+                    from_op,
+                    to_op,
+                    peer,
+                    "metadata repair stalled; re-requesting remaining window"
+                );
+                self.send_request_prepares(
+                    consensus.cluster(),
+                    consensus.replica(),
+                    peer,
+                    nonce,
+                    from_op,
+                    to_op,
+                    consensus.namespace(),
+                )
+                .await;
+            }
+        }
     }
 }
 
@@ -1955,6 +2698,23 @@ where
         namespace: consensus.namespace(),
     };
     dispatch_vsr_actions::<B, P, J>(consensus, None, &[action]).await;
+}
+
+/// Re-stamp a stored prepare with the current view before retransmission.
+/// After a view change the primary re-sends its uncommitted suffix as its
+/// own prepares (VSR), but the journal keeps the original view stamp and
+/// `replicate_preflight` fences `header.view < view` as deposed-primary
+/// traffic -- a verbatim replay of the stored bytes would be ignored
+/// forever, wedging the commit walk on every peer. The stored buffer is
+/// shared with the journal, so the patch runs on an owned copy.
+fn restamp_prepare_view(stored: &[u8], view: u32) -> Option<Frozen<MESSAGE_ALIGN>> {
+    const VIEW_OFFSET: usize = std::mem::offset_of!(PrepareHeader, view);
+    let mut owned = server_common::iobuf::Owned::<MESSAGE_ALIGN>::copy_from_slice(stored);
+    owned.as_mut_slice()[VIEW_OFFSET..VIEW_OFFSET + std::mem::size_of::<u32>()]
+        .copy_from_slice(&view.to_ne_bytes());
+    Message::<GenericHeader>::try_from(owned)
+        .ok()
+        .map(Message::into_frozen)
 }
 
 /// Dispatch a list of `VsrAction`s by constructing the appropriate
@@ -2037,6 +2797,19 @@ async fn dispatch_vsr_actions<B, P, J>(
                     });
                 send(*target, msg.into_generic().into_frozen()).await;
             }
+            VsrAction::SendRequestStartView { view, namespace } => {
+                let msg =
+                    Message::<RequestStartViewHeader>::new(size_of::<RequestStartViewHeader>())
+                        .transmute_header(|_, h: &mut RequestStartViewHeader| {
+                            h.command = Command2::RequestStartView;
+                            h.cluster = cluster;
+                            h.replica = self_id;
+                            h.view = *view;
+                            h.namespace = *namespace;
+                            h.size = size_of::<RequestStartViewHeader>() as u32;
+                        });
+                broadcast(msg.into_generic().into_frozen()).await;
+            }
             VsrAction::SendStartView {
                 view,
                 op,
@@ -2094,12 +2867,22 @@ async fn dispatch_vsr_actions<B, P, J>(
                 let Some(journal) = journal else {
                     continue;
                 };
+                let current_view = consensus.view();
                 for (header, replicas) in targets {
                     let Some(prepare) = journal.handle().entry(header).await else {
                         continue;
                     };
                     // Freeze the retransmit payload once; clone per target.
-                    let frozen = prepare.into_generic().into_frozen();
+                    let frozen = if prepare.header().view == current_view {
+                        prepare.into_generic().into_frozen()
+                    } else {
+                        let Some(restamped) =
+                            restamp_prepare_view(prepare.as_slice(), current_view)
+                        else {
+                            continue;
+                        };
+                        restamped
+                    };
                     for replica in replicas {
                         send(*replica, frozen.clone()).await;
                     }
@@ -2124,10 +2907,11 @@ async fn dispatch_vsr_actions<B, P, J>(
                     })
                     .collect();
                 if let Some(missing_op) = gap_at {
-                    // Journal repair is not yet implemented.Truncate the sequencer
-                    // to the last op we could rebuild so the next client
-                    // prepare chains correctly. Ops above the
-                    // gap are lost until journal repair is added.
+                    // A primary's own uncommitted suffix has no repair
+                    // source: peers ack'd nothing above the gap or the DVC
+                    // merge would have carried it, so the range is decided
+                    // lost. Truncate the sequencer to the last op we could
+                    // rebuild so the next client prepare chains correctly.
                     let rebuilt_up_to = missing_op.saturating_sub(1);
                     tracing::warn!(
                         replica = self_id,
@@ -2244,6 +3028,7 @@ async fn dispatch_partition_journal_actions<B, P>(
                 // needs to become durable before cluster workloads go to
                 // production. Server boot emits a loud warning to the
                 // operator (see `main.rs`).
+                let current_view = consensus.view();
                 for (header, replicas) in targets {
                     let Some(prepare) = journal.entry(header).await else {
                         continue;
@@ -2255,6 +3040,16 @@ async fn dispatch_partition_journal_actions<B, P>(
                     // above and avoids both the per-target 4 KiB memcpy
                     // and the prior `.expect` that would panic the shard
                     // on a corrupted journal entry.
+                    let prepare = if header.view == current_view {
+                        prepare
+                    } else {
+                        let Some(restamped) =
+                            restamp_prepare_view(prepare.as_slice(), current_view)
+                        else {
+                            continue;
+                        };
+                        restamped
+                    };
                     for replica in replicas {
                         send(*replica, prepare.clone()).await;
                     }
