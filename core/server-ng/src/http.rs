@@ -25,6 +25,7 @@
 mod admission;
 mod error;
 mod extractor;
+mod forward;
 mod handlers;
 mod jwks;
 mod jwt;
@@ -33,6 +34,7 @@ mod reply;
 mod session;
 mod state;
 mod submit;
+mod tls;
 mod wire;
 
 use std::cell::{Cell, RefCell};
@@ -47,16 +49,16 @@ use std::sync::atomic::AtomicU64;
 use axum::Router;
 use axum::extract::{DefaultBodyLimit, Request};
 use axum::http::{HeaderName, HeaderValue, Method};
-use axum::middleware::{Next, from_fn};
+use axum::middleware::{Next, from_fn, from_fn_with_state};
 use axum::routing::{delete, get, post, put};
-use configs::cluster::{ClusterConfig, TransportPorts};
 use configs::http::{HttpConfig, HttpCorsConfig};
+use configs::ng_cluster::{ClusterConfig, TransportPorts, http_forwarding_key_material};
 use configs::server_ng::NgSystemConfig;
 use iggy_common::IggyError;
 use message_bus::client_listener;
 use send_wrapper::SendWrapper;
 use tower_http::cors::{AllowOrigin, CorsLayer};
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use crate::bootstrap::ServerNgShard;
 use crate::cluster_meta::ClusterRoster;
@@ -76,7 +78,9 @@ use crate::http::state::{HttpInner, HttpState, insert_view_header};
 use crate::server_error::ServerNgError;
 
 /// Bind the shard-0 HTTP listener and spawn the `cyper-axum` serve loop as a
-/// background task on shard 0's compio runtime.
+/// background task on shard 0's compio runtime. Serves HTTPS when
+/// `http.tls.enabled` (a TLS accept pump feeds handshaken streams to the
+/// serve loop, see [`mod@tls`]), plain HTTP otherwise.
 ///
 /// The caller gates this to shard 0 and to `http.enabled`; the listener stops
 /// when the bus shutdown token fires.
@@ -84,8 +88,8 @@ use crate::server_error::ServerNgError;
 /// # Errors
 ///
 /// Returns [`ServerNgError`] if the JWT manager cannot be built from
-/// `http_config.jwt`, the `[http.cors]` config is invalid, or the listener
-/// cannot bind to `addr`.
+/// `http_config.jwt`, the `[http.cors]` config is invalid, the `[http.tls]`
+/// credentials cannot be loaded, or the listener cannot bind to `addr`.
 pub async fn start(
     shard: &Rc<ServerNgShard>,
     addr: SocketAddr,
@@ -94,7 +98,28 @@ pub async fn start(
     system_config: Arc<NgSystemConfig>,
     self_ports: TransportPorts,
 ) -> Result<(), ServerNgError> {
-    let jwt = JwtManager::build(&http_config.jwt)?;
+    // In cluster mode with no configured JWT secret the signing key derives
+    // from the cluster PSK, so a bearer minted on any node verifies on every
+    // node - the invariant follower-to-primary forwarding depends on.
+    let cluster_psk =
+        (cluster.enabled && cluster.auth.enabled && !cluster.auth.shared_secret.is_empty())
+            .then_some(cluster.auth.shared_secret.as_str());
+    let jwt = JwtManager::build(&http_config.jwt, cluster_psk)?;
+    // Forwarding needs a bearer every node can verify; without key material it
+    // degrades to off (followers answer the transient 503) instead of failing
+    // the boot, so keyless clusters still serve HTTP node-locally.
+    let forwarding_active = http_forwarding_key_material(&http_config.jwt, cluster);
+    if cluster.enabled && !forwarding_active {
+        warn!(
+            "cluster mode with http enabled but no http.jwt secrets and no cluster.auth: bearers are node-local and follower-to-primary forwarding is disabled - control-plane writes on followers answer a transient 503; configure http.jwt encoding/decoding secrets or enable cluster.auth (identical on every node) to activate forwarding"
+        );
+    }
+    // Saturating: a configured limit past the pointer width (32-bit target,
+    // >4 GiB value) clamps to the largest enforceable cap instead of wrapping.
+    let max_request_size =
+        usize::try_from(http_config.max_request_size.as_bytes_u64()).unwrap_or(usize::MAX);
+    let forward =
+        forward::build_forward_state(&http_config.tls, max_request_size, forwarding_active)?;
     // Validated before bind so a bad [http.cors] fails boot before the socket
     // opens and the "started" log prints.
     let cors = http_config
@@ -103,7 +128,6 @@ pub async fn start(
         .then(|| configure_cors(&http_config.cors))
         .transpose()?;
     let (listener, bound_addr) = client_listener::tcp::bind(addr).await?;
-    info!(address = %bound_addr, "server-ng HTTP listener started");
 
     let state: HttpState = SendWrapper::new(Rc::new(HttpInner {
         shard: Rc::clone(shard),
@@ -128,34 +152,50 @@ pub async fn start(
             metadata_view: Arc::new(AtomicU64::new(crate::cluster_meta::METADATA_VIEW_UNKNOWN)),
         },
         in_flight_writes: Cell::new(0),
+        forward,
     }));
-    // Saturating: a configured limit past the pointer width (32-bit target,
-    // >4 GiB value) clamps to the largest enforceable cap instead of wrapping.
-    let max_request_size =
-        usize::try_from(http_config.max_request_size.as_bytes_u64()).unwrap_or(usize::MAX);
-    let router = router(state, max_request_size, cors);
+    let router = router(state, max_request_size, cors, http_config.web_ui);
 
-    let shutdown = shard.bus.token();
-    let handle = compio::runtime::spawn(async move {
-        if let Err(error) = cyper_axum::serve(listener, router)
-            .with_graceful_shutdown(async move { shutdown.wait().await })
-            .await
-        {
-            error!(%error, "server-ng HTTP listener terminated with error");
-        }
-    });
-    shard.bus.track_background(handle);
+    if http_config.tls.enabled {
+        let server_config = tls::load_http_tls_server_config(&http_config.tls)?;
+        let (connections, pump) =
+            tls::spawn_accept_pump(listener, server_config, shard.bus.token());
+        shard.bus.track_background(pump);
+        info!(address = %bound_addr, "server-ng HTTPS listener started");
+        let handle = compio::runtime::spawn(tls::serve(connections, router, shard.bus.token()));
+        shard.bus.track_background(handle);
+    } else {
+        info!(address = %bound_addr, "server-ng HTTP listener started");
+        let shutdown = shard.bus.token();
+        let handle = compio::runtime::spawn(async move {
+            if let Err(error) = cyper_axum::serve(listener, router)
+                .with_graceful_shutdown(async move { shutdown.wait().await })
+                .await
+            {
+                error!(%error, "server-ng HTTP listener terminated with error");
+            }
+        });
+        shard.bus.track_background(handle);
+    }
 
     Ok(())
 }
 
 /// Health-probe path. Public and pre-auth, and the one success route reached
-/// without proving a credential, so the `X-Iggy-View` layer withholds the
+/// without proving a credential, so the `Iggy-View` layer withholds the
 /// cluster-internal view number here (see the response layer below).
 const PING_PATH: &str = "/ping";
 
 /// Assemble the shard-0 router: unauthenticated health + login routes plus the
 /// authenticated REST surface.
+///
+/// The surface is split by consensus dependency. The control-plane routes -
+/// whose writes all commit through the metadata consensus group - carry the
+/// `forward_to_primary` route layer, so on a follower they are relayed to the
+/// primary instead of failing with a transient 503 (reads under that layer
+/// still serve locally unless `?consistency=linearizable`). The local routes
+/// never need the metadata primary: health, the login/refresh flows (STM read
+/// + JWT mint), node-local reads, and the partition-plane routes.
 ///
 /// `max_request_size` becomes the router-wide `DefaultBodyLimit` (413 past
 /// it), exactly like the legacy server: it bounds the per-request term of the
@@ -168,19 +208,17 @@ const PING_PATH: &str = "/ping";
 /// `Authorization` header and matches none of the method routes - would 401 or
 /// 405 if it reached the router; the outermost `CorsLayer` answers it first
 /// instead, and stamps the CORS response headers over every reply, including
-/// the inner layer's `x-iggy-view`.
-fn router(state: HttpState, max_request_size: usize, cors: Option<CorsLayer>) -> Router {
-    // Cloned for the response layer so `X-Iggy-View` reads the live view per
+/// the inner layer's `iggy-view`.
+fn router(
+    state: HttpState,
+    max_request_size: usize,
+    cors: Option<CorsLayer>,
+    web_ui: bool,
+) -> Router {
+    // Cloned for the response layer so `Iggy-View` reads the live view per
     // response; the original `state` is moved into `with_state` below.
     let view_source = state.clone();
-    let router = Router::new()
-        .route(PING_PATH, get(ping))
-        .route("/users/login", post(login_user))
-        .route("/users/refresh-token", post(refresh_token))
-        .route(
-            "/personal-access-tokens/login",
-            post(login_with_personal_access_token),
-        )
+    let forwardable = Router::new()
         .route("/users", get(get_users).post(create_user))
         .route(
             "/users/{user_id}",
@@ -218,6 +256,35 @@ fn router(state: HttpState, max_request_size: usize, cors: Option<CorsLayer>) ->
             delete(delete_segments),
         )
         .route(
+            "/streams/{stream_id}/topics/{topic_id}/consumer-groups",
+            get(get_cgs).post(create_cg),
+        )
+        .route(
+            "/streams/{stream_id}/topics/{topic_id}/consumer-groups/{group_id}",
+            get(get_cg).delete(delete_cg),
+        )
+        .route("/personal-access-tokens", get(get_pats).post(create_pat))
+        .route("/personal-access-tokens/{name}", delete(delete_pat))
+        .route_layer(from_fn_with_state(
+            state.clone(),
+            forward::forward_to_primary,
+        ));
+    // The partition-plane routes (produce, consumer-offset writes) stay local:
+    // each partition is its own consensus group whose primary can diverge from
+    // the metadata primary, so forwarding them to the metadata primary would
+    // livelock whenever the two disagree.
+    // TODO: forward partition-plane writes to their own partition group's
+    // primary (requires resolving the target partition from the request before
+    // dispatch, and rewriting balanced partitioning to an explicit partition).
+    let local = Router::new()
+        .route(PING_PATH, get(ping))
+        .route("/users/login", post(login_user))
+        .route("/users/refresh-token", post(refresh_token))
+        .route(
+            "/personal-access-tokens/login",
+            post(login_with_personal_access_token),
+        )
+        .route(
             "/streams/{stream_id}/topics/{topic_id}/messages",
             get(poll_messages).post(send_messages),
         )
@@ -229,21 +296,14 @@ fn router(state: HttpState, max_request_size: usize, cors: Option<CorsLayer>) ->
             "/streams/{stream_id}/topics/{topic_id}/consumer-offsets/{consumer_id}",
             delete(delete_consumer_offset),
         )
-        .route(
-            "/streams/{stream_id}/topics/{topic_id}/consumer-groups",
-            get(get_cgs).post(create_cg),
-        )
-        .route(
-            "/streams/{stream_id}/topics/{topic_id}/consumer-groups/{group_id}",
-            get(get_cg).delete(delete_cg),
-        )
-        .route("/personal-access-tokens", get(get_pats).post(create_pat))
-        .route("/personal-access-tokens/{name}", delete(delete_pat))
         .route("/stats", get(get_stats))
         .route("/snapshot", post(get_snapshot))
         .route("/cluster/metadata", get(get_cluster_metadata))
         .route("/clients", get(get_clients))
-        .route("/clients/{client_id}", get(get_client))
+        .route("/clients/{client_id}", get(get_client));
+    let router = Router::new()
+        .merge(forwardable)
+        .merge(local)
         .with_state(state)
         .layer(DefaultBodyLimit::max(max_request_size))
         .layer(from_fn(move |request: Request, next: Next| {
@@ -263,10 +323,42 @@ fn router(state: HttpState, max_request_size: usize, cors: Option<CorsLayer>) ->
                 }
             }
         }));
-    match cors {
+    let router = match cors {
         Some(cors) => router.layer(cors),
         None => router,
+    };
+
+    merge_web_ui(router, web_ui)
+}
+
+/// Merge the unauthenticated `/ui` static-asset surface when `web_ui` is set.
+///
+/// The caller merges this outermost - after `with_state`, the body limit, the
+/// view-header layer, and CORS - mirroring the legacy server. Staying past the
+/// view-header layer also keeps the cluster-internal view number off these
+/// unauthenticated responses, the same anon-leak gate `/ping` gets above.
+///
+/// Without the `iggy-web` feature the assets are not compiled in, so an enabled
+/// flag only warns instead of serving.
+fn merge_web_ui(router: Router, web_ui: bool) -> Router {
+    #[cfg(feature = "iggy-web")]
+    let router = if web_ui {
+        info!("Web UI enabled at /ui");
+        router.merge(crate::web::router())
+    } else {
+        router
+    };
+
+    #[cfg(not(feature = "iggy-web"))]
+    if web_ui {
+        tracing::warn!(
+            "Web UI is enabled in configuration (http.web_ui = true) but the server \
+             was not compiled with 'iggy-web' feature. The Web UI will not be available. \
+             To enable it, rebuild the server with: cargo build --features iggy-web"
+        );
     }
+
+    router
 }
 
 /// Build the [`CorsLayer`] from `[http.cors]`, porting the legacy server's
@@ -402,7 +494,7 @@ mod tests {
             allowed_methods: vec!["GET".to_owned(), "POST".to_owned()],
             allowed_origins: vec!["*".to_owned()],
             allowed_headers: vec!["content-type".to_owned(), "authorization".to_owned()],
-            exposed_headers: vec!["x-iggy-view".to_owned()],
+            exposed_headers: vec!["iggy-view".to_owned()],
             allow_credentials: false,
             allow_private_network: false,
         }
