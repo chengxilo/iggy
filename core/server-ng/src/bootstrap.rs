@@ -926,6 +926,7 @@ async fn shard_main(
                     recovered.snapshot,
                     recovered.last_applied_op,
                     recovered.last_journaled_op,
+                    recovered.client_table,
                 )),
             )
         }
@@ -944,8 +945,10 @@ async fn shard_main(
     // Metadata consensus + journal + snapshot live only on shard 0.
     // `IggyShard::tick_metadata` short-circuits when `consensus.is_none()`,
     // so peer shards have no caller that reads `journal` or `snapshot`.
-    let (metadata_consensus, journal_for_metadata, snapshot_for_metadata) =
-        if let Some((journal, snapshot, last_applied_op, last_journaled_op)) = owner_state {
+    let (metadata_consensus, journal_for_metadata, snapshot_for_metadata, recovered_client_table) =
+        if let Some((journal, snapshot, last_applied_op, last_journaled_op, client_table)) =
+            owner_state
+        {
             let snapshot_floor = snapshot.as_ref().map_or(0, IggySnapshot::sequence_number);
             let commit_watermark = last_applied_op.unwrap_or(snapshot_floor);
             let restored_op = last_journaled_op.unwrap_or(snapshot_floor);
@@ -960,9 +963,9 @@ async fn shard_main(
                 config.metadata.prepare_queue_depth,
                 cluster_heartbeat_ticks(config),
             );
-            (Some(consensus), Some(journal), snapshot)
+            (Some(consensus), Some(journal), snapshot, Some(client_table))
         } else {
-            (None, None, None)
+            (None, None, None, None)
         };
     let metadata = ServerNgMetadata::new(
         metadata_consensus,
@@ -971,6 +974,14 @@ async fn shard_main(
         mux_stm,
         Some(PathBuf::from(&config.system.path)),
     );
+    // Reinstall the sessions the WAL replay rebuilt, so a rebooted node
+    // dedups retries and admits continuations from clients that kept their
+    // identity across the restart (IGGY-137).
+    if let Some(client_table) = recovered_client_table {
+        // Refusal (a client registered before this ran) keeps the live table
+        // and is logged by the callee; boot continues either way.
+        let _ = metadata.install_client_table(client_table);
+    }
     // Shard 0's copy resolves the `ServerDefault` sentinels (max topic size and
     // message expiry) at admission; every shard's copy backs the same resolution in responses.
     metadata.set_default_max_topic_size(config.system.topic.max_size.as_bytes_u64());
@@ -1206,6 +1217,21 @@ async fn shard_main(
         let coord = shard
             .coordinator()
             .expect("shard 0 always has a coordinator attached by the builder");
+        // Reseed the client-id minter above every recovered entry before any
+        // listener accepts. The counter is per process; the table it must not
+        // collide with was rebuilt from the previous boot's WAL. Keyed by view
+        // so a later promotion refolds the table (the minting path calls the
+        // same method, see `HttpInner::register_session_once`).
+        let boot_view = shard
+            .plane
+            .metadata()
+            .consensus
+            .as_ref()
+            .map_or(0, consensus::VsrConsensus::view);
+        coord.seed_client_sequence(
+            boot_view,
+            shard.plane.metadata().client_table.borrow().client_ids(),
+        );
         let on_client_request =
             make_client_request_handler(&shard, &sessions, Arc::clone(&config.system));
         let (accepted_replica, dialed_replica) =

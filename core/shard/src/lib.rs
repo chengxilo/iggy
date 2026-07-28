@@ -52,6 +52,7 @@ use message_bus::replica::listener::MessageHandler;
 use metadata::IggyMetadata;
 use metadata::impls::metadata::StreamsFrontend;
 use metadata::stm::StateMachine;
+use metadata::{BoundSession, MetadataSubmitError};
 use partitions::{IggyPartition, IggyPartitions, PollFragments, PollingArgs, PollingConsumer};
 use server_common::sharding::{IggyNamespace, PartitionLocation, ShardId};
 use server_common::{MESSAGE_ALIGN, Message, MessageBag, iobuf::Frozen};
@@ -161,14 +162,19 @@ pub fn channel<T: Send + 'static>(capacity: usize) -> (Sender<T>, Receiver<T>) {
 /// connection homes on a peer shard, that shard verifies credentials and
 /// owns the session locally, but the consensus proposal (`Register` /
 /// `Logout`) must execute on shard 0. The peer hands just that step here
-/// and awaits the committed op number over `reply` (`None` = transient
-/// submit failure; all `MetadataSubmitError` variants are transient by
-/// contract, so the caller retries rather than distinguishing them).
+/// and awaits the outcome over `reply`. `Register` carries the submit error
+/// verbatim because one variant
+/// (`MetadataSubmitError::ClientIdOwnedByAnotherUser`) is terminal and must
+/// not be retried; the remaining variants are transient by contract.
 pub enum MetadataSubmit {
     Register {
         vsr_client_id: u128,
         user_id: u32,
-        reply: Sender<Option<u64>>,
+        /// The committed bind, or the submit error verbatim. The error must
+        /// survive the hop: the ownership refusal is TERMINAL, and flattening it
+        /// into "no reply" makes the login look transient, which costs the
+        /// client a retry storm of full password verifications.
+        reply: Sender<Result<BoundSession, MetadataSubmitError>>,
     },
     Logout {
         vsr_client_id: u128,
