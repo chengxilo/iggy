@@ -130,7 +130,7 @@ run_suite(){
   local svc="$1" emoji="$2" label="$3"
   if [ "$FEATURE" = "leader_redirection" ]; then
     case "$svc" in
-      rust-bdd|go-bdd|csharp-bdd) ;;
+      rust-bdd|go-bdd|csharp-bdd|java-bdd) ;;
       *) unsupported "$FEATURE" "$svc" || return 1; return 0 ;;
     esac
   fi
