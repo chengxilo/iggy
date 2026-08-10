@@ -49,7 +49,7 @@ use crate::responses::{
 use crate::session_manager::SessionManager;
 use crate::snapshot;
 use crate::users::maybe_rewrite_user_password_request;
-use crate::wire::{request_body, usize_to_u32};
+use crate::wire::{request_body, usize_to_u32, verify_request_checksum};
 use bytes::Bytes;
 use configs::server_ng::NgSystemConfig;
 use consensus::{
@@ -860,6 +860,37 @@ async fn handle_client_request<B, MJ, S, SB>(
             return;
         }
     };
+
+    // The last point that still sees the body the CLIENT sent; every rewrite below
+    // substitutes server-chosen bytes and carries the stamp through unchanged.
+    if let Err(error) = verify_request_checksum(&request) {
+        warn!(
+            transport_client_id,
+            operation = ?request.header().operation,
+            request = request.header().request,
+            "dropping client request whose body does not match its own checksum"
+        );
+        let commit = current_metadata_commit(shard);
+        let reply = build_deny_reply(
+            request.header(),
+            transport_client_id,
+            0,
+            commit,
+            error.as_code(),
+        );
+        if let Err(send_error) = shard
+            .bus
+            .send_to_client(transport_client_id, reply.into_generic().into_frozen())
+            .await
+        {
+            warn!(
+                transport_client_id,
+                error = %send_error,
+                "failed to send request-checksum deny reply"
+            );
+        }
+        return;
+    }
 
     ensure_transport_connection(shard, sessions, transport_client_id);
 
@@ -3268,12 +3299,13 @@ mod tests {
                 client,
                 request,
                 user_id: 0,
-                checksum: 42,
                 namespace: server_common::sharding::METADATA_CONSENSUS_NAMESPACE,
                 ..Default::default()
             };
         }
-        message
+        // A real identity, not a placeholder: `on_replicate` recomputes it before the
+        // prepare reaches the WAL, so an arbitrary value reads as transit corruption.
+        consensus::seal_prepare_checksum(message)
     }
 
     /// Regression test for the production failure chain "CLI stream
@@ -3337,6 +3369,7 @@ mod tests {
                 messages_required_to_save: 1,
                 size_of_messages_required_to_save: iggy_common::IggyByteSize::from(1024_u64),
                 enforce_fsync: false,
+                validate_checksum: true,
                 segment_size: iggy_common::IggyByteSize::from(1_048_576_u64),
                 encryptor: None,
             },
@@ -3455,6 +3488,7 @@ mod tests {
                 messages_required_to_save: 1,
                 size_of_messages_required_to_save: iggy_common::IggyByteSize::from(1024_u64),
                 enforce_fsync: false,
+                validate_checksum: true,
                 segment_size: iggy_common::IggyByteSize::from(1_048_576_u64),
                 encryptor: None,
             },
@@ -3578,6 +3612,7 @@ mod tests {
                 messages_required_to_save: 1,
                 size_of_messages_required_to_save: iggy_common::IggyByteSize::from(1024_u64),
                 enforce_fsync: false,
+                validate_checksum: true,
                 segment_size: iggy_common::IggyByteSize::from(1_048_576_u64),
                 encryptor: None,
             },
@@ -3640,6 +3675,7 @@ mod tests {
                 messages_required_to_save: 1,
                 size_of_messages_required_to_save: iggy_common::IggyByteSize::from(1024_u64),
                 enforce_fsync: false,
+                validate_checksum: true,
                 segment_size: iggy_common::IggyByteSize::from(1_048_576_u64),
                 encryptor: None,
             },
