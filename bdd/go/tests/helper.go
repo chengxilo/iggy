@@ -87,7 +87,7 @@ func sendTestMessages(
 		return nil, err
 	}
 	partitioning := iggcon.PartitionId(partitionID)
-	if err = cli.SendMessages(ctx, streamID, topicID, partitioning, messages); err != nil {
+	if _, err = cli.SendMessages(ctx, streamID, topicID, partitioning, messages); err != nil {
 		return nil, fmt.Errorf("failed to send messages: %w", err)
 	}
 	last := messages[len(messages)-1]
