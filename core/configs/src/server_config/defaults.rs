@@ -24,7 +24,8 @@
 //! [`crate::common::defaults`].
 
 use super::cluster::{
-    ClusterAuthConfig, ClusterConfig, ClusterNodeConfig, ClusterTlsConfig, TransportPorts,
+    ClusterAuthConfig, ClusterConfig, ClusterCoordinatorConfig, ClusterNodeConfig,
+    ClusterTlsConfig, TransportPorts,
 };
 use super::message_bus::MessageBusConfig;
 use super::metadata::MetadataConfig;
@@ -150,6 +151,7 @@ impl Default for ClusterConfig {
                 .collect(),
             auth: ClusterAuthConfig::default(),
             tls: ClusterTlsConfig::default(),
+            coordinator: ClusterCoordinatorConfig::default(),
         }
     }
 }
