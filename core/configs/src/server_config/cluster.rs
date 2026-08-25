@@ -503,20 +503,41 @@ impl TryFrom<ClusterNodeConfig> for ResolvedClusterNode {
             ConfigurationError::InvalidConfigurationValue
         })?;
 
-        let catch_all =
-            match config.advertised_address.as_deref() {
-                Some(advertised_address) => advertised_address
+        if replica_ip.to_canonical().is_unspecified() {
+            eprintln!(
+                "Invalid cluster configuration: IP '{}' for node '{}' is the unspecified \
+                 address; declare the address peers and clients reach this node at",
+                config.ip, config.name
+            );
+            return Err(ConfigurationError::InvalidConfigurationValue);
+        }
+
+        let catch_all = match config.advertised_address.as_deref() {
+            Some(advertised_address) => {
+                let address = advertised_address
                     .parse::<AdvertisedAddress>()
                     .map_err(|error| {
                         eprintln!(
                             "Invalid cluster configuration: advertised_address \
-                             '{advertised_address}' for node '{}': {error}",
+                                 '{advertised_address}' for node '{}': {error}",
                             config.name
                         );
                         ConfigurationError::InvalidConfigurationValue
-                    })?,
-                None => AdvertisedAddress::Ip(replica_ip),
-            };
+                    })?;
+                if address.is_unspecified() {
+                    eprintln!(
+                        "Invalid cluster configuration: advertised_address \
+                         '{advertised_address}' for node '{}' is the unspecified address, which \
+                         tells a client which interfaces this node accepts on rather than where \
+                         to reach it; declare a routable address",
+                        config.name
+                    );
+                    return Err(ConfigurationError::InvalidConfigurationValue);
+                }
+                address
+            }
+            None => AdvertisedAddress::Ip(replica_ip),
+        };
 
         let mut selectors = Vec::with_capacity(config.advertised_addresses.len());
         for selector in &config.advertised_addresses {
@@ -539,6 +560,15 @@ impl TryFrom<ClusterNodeConfig> for ResolvedClusterNode {
                     );
                     ConfigurationError::InvalidConfigurationValue
                 })?;
+            if address.is_unspecified() {
+                eprintln!(
+                    "Invalid cluster configuration: advertised_addresses address '{}' for node \
+                     '{}' is the unspecified address; declare the address clients in '{}' reach \
+                     this node at",
+                    selector.address, config.name, selector.client_cidr
+                );
+                return Err(ConfigurationError::InvalidConfigurationValue);
+            }
             selectors.push((canonical_ip_net(network.trunc()), address));
         }
 
@@ -1742,6 +1772,35 @@ mod advertised_for_tests {
         node.advertised_address = None;
         node.ip = "iggy_node".to_owned();
         assert!(ResolvedClusterNode::try_from(node).is_err());
+    }
+
+    #[test]
+    fn refuses_a_node_advertising_the_unspecified_address() {
+        // The conversion is reachable without the validator, so the "every
+        // resolved node is dialable" invariant has to hold here rather than
+        // rely on validation having run first.
+        for wildcard in ["0.0.0.0", "::", "::ffff:0.0.0.0"] {
+            let mut roster_ip = node_with_selectors(Vec::new());
+            roster_ip.advertised_address = None;
+            roster_ip.ip = wildcard.to_owned();
+            assert!(
+                ResolvedClusterNode::try_from(roster_ip).is_err(),
+                "roster ip '{wildcard}' is not dialable"
+            );
+
+            let mut catch_all = node_with_selectors(Vec::new());
+            catch_all.advertised_address = Some(wildcard.to_owned());
+            assert!(
+                ResolvedClusterNode::try_from(catch_all).is_err(),
+                "advertised_address '{wildcard}' is not dialable"
+            );
+
+            let selectors = node_with_selectors(vec![selector("10.0.0.0/16", wildcard)]);
+            assert!(
+                ResolvedClusterNode::try_from(selectors).is_err(),
+                "selector address '{wildcard}' is not dialable"
+            );
+        }
     }
 
     #[test]
