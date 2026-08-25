@@ -54,7 +54,7 @@ ENVIRONMENT VARIABLES:
 
     Common examples:
         IGGY_SYSTEM_PATH=/data/iggy                    # Data directory
-        IGGY_TCP_ADDRESS=0.0.0.0:8090                  # TCP listener address
+        IGGY_TCP_ADDRESS=127.0.0.1:8090                # TCP listener address
         IGGY_HTTP_ADDRESS=0.0.0.0:3000                 # HTTP listener address
         IGGY_SYSTEM_LOGGING_LEVEL=debug                # Log level
         IGGY_ROOT_USERNAME=iggy                        # Root user, set with the password
