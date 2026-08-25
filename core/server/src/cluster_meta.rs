@@ -29,7 +29,7 @@
 //! node is the cluster-disabled fallback, shared by both callers.
 
 use configs::ConfigurationError;
-use configs::cluster::{ClusterConfig, ResolvedClusterNode, TransportPorts};
+use configs::cluster::{AdvertisedAddress, ClusterConfig, ResolvedClusterNode, TransportPorts};
 use iggy_common::{
     ClusterMetadata, ClusterNode, ClusterNodeRole, ClusterNodeStatus, TransportEndpoints,
 };
@@ -44,8 +44,24 @@ const SELF_NODE_NAME: &str = "iggy-node";
 /// single-node label.
 const SINGLE_NODE_CLUSTER_NAME: &str = "single-node";
 
+/// Client-facing host for the cluster-disabled single node, normalized the way
+/// [`client_host`] normalizes the roster path so one address cannot publish in
+/// two spellings. Normalizing matters beyond tidiness: a declared
+/// `[2001:db8::1]` published verbatim is bracketed a second time when a client
+/// joins it to a port, yielding an address that no longer parses.
+///
+/// `NodeConfig::validate` has already accepted `declared`, so the parse only
+/// fails on a caller that skipped validation; such a value is passed through
+/// rather than dropped.
 pub fn self_advertised_address(declared: Option<&str>, bind: IpAddr) -> String {
-    declared.map_or_else(|| bind.to_string(), ToOwned::to_owned)
+    declared.map_or_else(
+        || bind.to_string(),
+        |declared| {
+            declared
+                .parse::<AdvertisedAddress>()
+                .map_or_else(|_| declared.to_owned(), |address| address.to_string())
+        },
+    )
 }
 
 /// Resolve the roster a [`ClusterRoster`] serves, which is only the configured
@@ -353,6 +369,28 @@ mod tests {
         );
         assert_eq!(
             self_advertised_address(None, "2001:db8::1".parse().unwrap()),
+            "2001:db8::1"
+        );
+    }
+
+    #[test]
+    fn self_advertised_address_normalizes_a_declared_address() {
+        let bind = "192.0.2.10".parse().unwrap();
+        // The roster path renders through the same `Display`, so a config
+        // variant must not publish differently depending on which path served
+        // it.
+        assert_eq!(
+            self_advertised_address(Some("Broker.Example.COM"), bind),
+            "broker.example.com"
+        );
+        // A client joins the published host to a port; leaving the brackets on
+        // would bracket it twice into an address that no longer parses.
+        assert_eq!(
+            self_advertised_address(Some("[2001:db8::1]"), bind),
+            "2001:db8::1"
+        );
+        assert_eq!(
+            self_advertised_address(Some("2001:DB8::1"), bind),
             "2001:db8::1"
         );
     }
