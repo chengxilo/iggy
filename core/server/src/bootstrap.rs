@@ -3083,6 +3083,20 @@ fn merge_roster_port_with_bind_ip(
     listen_addr
 }
 
+/// Whether the address cluster metadata publishes for this node misses one of
+/// its own listeners. Only a derived address is judged: it names the
+/// `tcp.address` bind interface, so a listener on a different one is
+/// unreachable at the published address. A declared `node.advertised_address`
+/// is deliberate (NAT, a public name) and says nothing about which local
+/// interface serves a transport, so it stays quiet.
+fn derived_address_misses_listener(
+    declared: Option<&str>,
+    self_advertised: &str,
+    listen_addr: SocketAddr,
+) -> bool {
+    declared.is_none() && roster_ip_unreachable_from_bind_addr(self_advertised, listen_addr)
+}
+
 /// Whether a dialer aiming at the advertised roster ip misses `listen_addr`. An
 /// unspecified bind covers every interface, and a roster ip that parses as
 /// neither IPv4 nor IPv6 (a DNS name, say) can resolve to the bound interface,
@@ -3152,16 +3166,38 @@ async fn start_tcp_runtime(
         .await?;
     }
 
+    // Cluster metadata carries one host for all four transports, so a listener
+    // on another interface is unreachable at it. Only a derived address is
+    // judged; TCP is never judged even then, since the derived address is its
+    // own bind interface.
+    let declared = config.node.advertised_address.as_deref();
+    let self_advertised = self_advertised_address(declared, topology.client_listen_addr.ip());
+    // A roster entry answers this per node in cluster mode, so the derived
+    // address is never served and none of these listeners are judged against it.
+    if !config.cluster.enabled {
+        for (transport, listen_addr) in [
+            ("http", topology.http_listen_addr),
+            ("quic", topology.quic_listen_addr),
+            ("websocket", topology.ws_listen_addr),
+        ] {
+            let Some(listen_addr) = listen_addr else {
+                continue;
+            };
+            if derived_address_misses_listener(declared, &self_advertised, listen_addr) {
+                warn!(
+                    "{transport} listener binds {listen_addr} but cluster metadata publishes \
+                     {self_advertised}, derived from tcp.address; a client reading that \
+                     metadata would not reach this listener. Set node.advertised_address to \
+                     the address clients dial."
+                );
+            }
+        }
+    }
+
     // HTTP is served over TCP but sits outside the replica_io / manual client
     // reactor, so it binds independently. Shard-0 gating comes from the sole
     // caller of this function.
     if let Some(http_addr) = topology.http_listen_addr {
-        // One host for all four transports, resolved from the client-facing
-        // TCP bind so both listeners publish the same node address.
-        let self_advertised = self_advertised_address(
-            config.node.advertised_address.as_deref(),
-            topology.client_listen_addr.ip(),
-        );
         let self_ports = configs::cluster::TransportPorts {
             tcp: config
                 .tcp
@@ -4994,6 +5030,37 @@ mod tests {
         assert!(!roster_ip_unreachable_from_bind_addr(
             "10.0.0.5",
             addr("10.0.0.5:18070")
+        ));
+    }
+
+    #[test]
+    fn derived_address_warns_only_when_it_misses_a_listener() {
+        // Derived from a loopback tcp.address while another transport serves
+        // an external interface: metadata would publish an address no client
+        // reaches. Every non-TCP listener carries the same exposure, since one
+        // host is published for all four.
+        for listener in ["10.0.0.5:3000", "10.0.0.5:8080", "10.0.0.5:8092"] {
+            assert!(
+                derived_address_misses_listener(None, "127.0.0.1", addr(listener)),
+                "{listener} is not reachable at 127.0.0.1"
+            );
+        }
+        // Same interface, and a wildcard bind that covers any of them.
+        assert!(!derived_address_misses_listener(
+            None,
+            "10.0.0.5",
+            addr("10.0.0.5:3000")
+        ));
+        assert!(!derived_address_misses_listener(
+            None,
+            "127.0.0.1",
+            addr("0.0.0.0:3000")
+        ));
+        // A declared address is deliberate and unrelated to local interfaces.
+        assert!(!derived_address_misses_listener(
+            Some("broker-1.example.com"),
+            "broker-1.example.com",
+            addr("10.0.0.5:3000")
         ));
     }
 
