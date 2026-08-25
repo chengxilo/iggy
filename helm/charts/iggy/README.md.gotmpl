@@ -235,6 +235,12 @@ metadata and refuses to start without it. The chart sets
 with `server.advertisedAddress` when clients arrive through a LoadBalancer or
 an Ingress.
 
+Declaring `IGGY_NODE_ADVERTISED_ADDRESS` in `server.env` yourself works too:
+the chart then leaves its own default out, so the variable is declared once.
+Setting it in `server.env` and in `server.advertisedAddress` at the same time
+is refused at render time rather than resolved silently, since only the
+`server.env` entry would take effect.
+
 ## Accessing the Server
 
 ### Port Forward
