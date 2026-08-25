@@ -3086,12 +3086,15 @@ fn merge_roster_port_with_bind_ip(
 /// Whether a dialer aiming at the advertised roster ip misses `listen_addr`. An
 /// unspecified bind covers every interface, and a roster ip that parses as
 /// neither IPv4 nor IPv6 (a DNS name, say) can resolve to the bound interface,
-/// so both cases stay quiet.
+/// so both cases stay quiet. Both sides reduce to the canonical form first, so
+/// the v4-mapped wildcard (`[::ffff:0.0.0.0]`, which a dual-stack host binds as
+/// `0.0.0.0`) stays quiet as well and `10.0.0.5` matches `::ffff:10.0.0.5`.
 fn roster_ip_unreachable_from_bind_addr(roster_ip: &str, listen_addr: SocketAddr) -> bool {
-    !listen_addr.ip().is_unspecified()
+    let bind_ip = listen_addr.ip().to_canonical();
+    !bind_ip.is_unspecified()
         && roster_ip
             .parse::<IpAddr>()
-            .is_ok_and(|parsed| parsed != listen_addr.ip())
+            .is_ok_and(|parsed| parsed.to_canonical() != bind_ip)
 }
 
 fn resolve_cluster_replica_peers(
@@ -4991,6 +4994,26 @@ mod tests {
         assert!(!roster_ip_unreachable_from_bind_addr(
             "10.0.0.5",
             addr("10.0.0.5:18070")
+        ));
+    }
+
+    #[test]
+    fn roster_mismatch_warning_is_silent_for_v4_mapped_binds() {
+        // `[::ffff:0.0.0.0]` is the v4 wildcard and `::ffff:10.0.0.5` is
+        // `10.0.0.5`, so neither reaches the dialer any differently than the
+        // plain spelling the case above covers.
+        assert!(!roster_ip_unreachable_from_bind_addr(
+            "10.0.0.5",
+            addr("[::ffff:0.0.0.0]:18070")
+        ));
+        assert!(!roster_ip_unreachable_from_bind_addr(
+            "10.0.0.5",
+            addr("[::ffff:10.0.0.5]:18070")
+        ));
+        // A genuine mismatch still warns through the mapped spelling.
+        assert!(roster_ip_unreachable_from_bind_addr(
+            "10.0.0.5",
+            addr("[::ffff:127.0.0.1]:18070")
         ));
     }
 }
