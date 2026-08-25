@@ -647,8 +647,13 @@ pub enum AdvertisedAddress {
 }
 
 impl AdvertisedAddress {
+    /// Whether this address is the unspecified one, which names the
+    /// interfaces a node accepts on rather than where a client reaches it.
+    /// Compared on the canonical form, so the v4-mapped spelling
+    /// (`::ffff:0.0.0.0`, which a dual-stack host binds as the v4 wildcard)
+    /// is caught alongside `0.0.0.0` and `::`.
     pub fn is_unspecified(&self) -> bool {
-        matches!(self, Self::Ip(ip) if ip.is_unspecified())
+        matches!(self, Self::Ip(ip) if ip.to_canonical().is_unspecified())
     }
 
     /// Render `host:port` for a URL or endpoint listing, bracketing IPv6
@@ -1024,7 +1029,7 @@ impl Validatable<ConfigurationError> for ClusterConfig {
                 ConfigurationError::InvalidConfigurationValue
             })?;
 
-            if node_ip.is_unspecified() {
+            if node_ip.to_canonical().is_unspecified() {
                 eprintln!(
                     "Invalid cluster configuration: IP '{}' for node '{}' is the unspecified \
                      address; declare the address peers and clients reach this node at",
@@ -1608,6 +1613,21 @@ mod advertised_address_tests {
     }
 
     #[test]
+    fn reports_every_spelling_of_the_unspecified_address() {
+        for wildcard in ["0.0.0.0", "::", "::ffff:0.0.0.0"] {
+            let address = wildcard.parse::<AdvertisedAddress>().unwrap();
+            assert!(
+                address.is_unspecified(),
+                "'{wildcard}' names interfaces, not a dial target"
+            );
+        }
+        for routable in ["203.0.113.1", "2001:db8::1", "::ffff:203.0.113.1", "broker"] {
+            let address = routable.parse::<AdvertisedAddress>().unwrap();
+            assert!(!address.is_unspecified(), "'{routable}' is dialable");
+        }
+    }
+
+    #[test]
     fn normalizes_hostname_to_lowercase() {
         let address = "Broker-1.Example.COM".parse::<AdvertisedAddress>();
         assert_eq!(
@@ -2031,7 +2051,7 @@ mod cluster_validate_tests {
 
     #[test]
     fn validate_rejects_an_unspecified_node_ip() {
-        for wildcard in ["0.0.0.0", "::"] {
+        for wildcard in ["0.0.0.0", "::", "::ffff:0.0.0.0"] {
             let mut nodes = vec![node("n1", 0), node("n2", 1)];
             nodes[0].ip = wildcard.to_owned();
             assert!(cfg(nodes).validate().is_err(), "{wildcard} is not dialable");
@@ -2052,7 +2072,7 @@ mod cluster_validate_tests {
 
     #[test]
     fn validate_rejects_an_unspecified_advertised_address() {
-        for wildcard in ["0.0.0.0", "::"] {
+        for wildcard in ["0.0.0.0", "::", "::ffff:0.0.0.0"] {
             let mut nodes = vec![node("n1", 0), node("n2", 1)];
             nodes[0].advertised_address = Some(wildcard.to_owned());
             assert!(cfg(nodes).validate().is_err(), "{wildcard} is not dialable");
@@ -2061,9 +2081,11 @@ mod cluster_validate_tests {
 
     #[test]
     fn validate_rejects_an_unspecified_selector_address() {
-        let mut nodes = vec![node("n1", 0), node("n2", 1)];
-        nodes[0].advertised_addresses = vec![selector("10.0.0.0/16", "0.0.0.0")];
-        assert!(cfg(nodes).validate().is_err());
+        for wildcard in ["0.0.0.0", "::", "::ffff:0.0.0.0"] {
+            let mut nodes = vec![node("n1", 0), node("n2", 1)];
+            nodes[0].advertised_addresses = vec![selector("10.0.0.0/16", wildcard)];
+            assert!(cfg(nodes).validate().is_err(), "{wildcard} is not dialable");
+        }
     }
 
     #[test]

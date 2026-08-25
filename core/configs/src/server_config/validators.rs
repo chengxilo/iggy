@@ -447,7 +447,7 @@ impl ServerConfig {
         if self.cluster.enabled || self.node.advertised_address.is_some() {
             return Ok(());
         }
-        if !bind.ip().is_unspecified() {
+        if !bind.ip().to_canonical().is_unspecified() {
             return Ok(());
         }
 
@@ -509,7 +509,7 @@ mod tests {
 
     #[test]
     fn given_wildcard_bind_without_advertised_address_when_validating_should_reject() {
-        for wildcard in ["0.0.0.0:8090", "[::]:8090"] {
+        for wildcard in ["0.0.0.0:8090", "[::]:8090", "[::ffff:0.0.0.0]:8090"] {
             let config = config_with_override(&format!(
                 "[tcp]\naddress = \"{wildcard}\"\n[cluster]\nenabled = false\n"
             ));
