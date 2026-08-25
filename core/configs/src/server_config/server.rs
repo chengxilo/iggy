@@ -113,6 +113,7 @@ pub struct ServerConfig {
     pub data_maintenance: DataMaintenanceConfig,
     #[serde(default)]
     pub node: NodeConfig,
+    #[serde(default)]
     pub personal_access_token: PersonalAccessTokenConfig,
     pub heartbeat: HeartbeatConfig,
     pub system: Arc<ServerSystemConfig>,
