@@ -513,32 +513,20 @@ impl TryFrom<ClusterNodeConfig> for ResolvedClusterNode {
             return Err(ConfigurationError::InvalidConfigurationValue);
         }
 
-        let catch_all = match config.advertised_address.as_deref() {
-            Some(advertised_address) => {
-                let address = advertised_address
+        let catch_all =
+            match config.advertised_address.as_deref() {
+                Some(advertised_address) => advertised_address
                     .parse::<AdvertisedAddress>()
                     .map_err(|error| {
                         eprintln!(
                             "Invalid cluster configuration: advertised_address \
-                                 '{advertised_address}' for node '{}': {error}",
+                         '{advertised_address}' for node '{}': {error}",
                             config.name
                         );
                         ConfigurationError::InvalidConfigurationValue
-                    })?;
-                if address.is_unspecified() {
-                    eprintln!(
-                        "Invalid cluster configuration: advertised_address \
-                         '{advertised_address}' for node '{}' is the unspecified address, which \
-                         tells a client which interfaces this node accepts on rather than where \
-                         to reach it; declare a routable address",
-                        config.name
-                    );
-                    return Err(ConfigurationError::InvalidConfigurationValue);
-                }
-                address
-            }
-            None => AdvertisedAddress::Ip(replica_ip),
-        };
+                    })?,
+                None => AdvertisedAddress::Ip(replica_ip.to_canonical()),
+            };
 
         let mut selectors = Vec::with_capacity(config.advertised_addresses.len());
         for selector in &config.advertised_addresses {
@@ -561,15 +549,6 @@ impl TryFrom<ClusterNodeConfig> for ResolvedClusterNode {
                     );
                     ConfigurationError::InvalidConfigurationValue
                 })?;
-            if address.is_unspecified() {
-                eprintln!(
-                    "Invalid cluster configuration: advertised_addresses address '{}' for node \
-                     '{}' is the unspecified address; declare the address clients in '{}' reach \
-                     this node at",
-                    selector.address, config.name, selector.client_cidr
-                );
-                return Err(ConfigurationError::InvalidConfigurationValue);
-            }
             selectors.push((canonical_ip_net(network.trunc()), address));
         }
 
@@ -669,8 +648,9 @@ pub struct TransportPorts {
 /// consisting solely of digits and dots are rejected as malformed IPv4 rather
 /// than accepted as hostnames, so `10.0.0.256` fails loudly instead of being
 /// handed to DNS. Hostnames normalize to lowercase and IPs to their canonical
-/// form ([`IpAddr`]), so textual variants of one address (`Broker.Example.COM`,
-/// `2001:DB8::1`, `[2001:db8::1]`) compare equal.
+/// form ([`IpAddr::to_canonical`]), so textual variants of one address
+/// (`Broker.Example.COM`, `2001:DB8::1`, `[2001:db8::1]`, `::ffff:10.0.0.1`)
+/// compare equal.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AdvertisedAddress {
     Ip(IpAddr),
@@ -678,15 +658,6 @@ pub enum AdvertisedAddress {
 }
 
 impl AdvertisedAddress {
-    /// Whether this address is the unspecified one, which names the
-    /// interfaces a node accepts on rather than where a client reaches it.
-    /// Compared on the canonical form, so the v4-mapped spelling
-    /// (`::ffff:0.0.0.0`, which a dual-stack host binds as the v4 wildcard)
-    /// is caught alongside `0.0.0.0` and `::`.
-    pub fn is_unspecified(&self) -> bool {
-        matches!(self, Self::Ip(ip) if ip.to_canonical().is_unspecified())
-    }
-
     /// Render `host:port` for a URL or endpoint listing, bracketing IPv6
     /// hosts (`[::1]:8080`) so the port separator stays unambiguous.
     pub fn authority(&self, port: u16) -> String {
@@ -694,6 +665,17 @@ impl AdvertisedAddress {
             Self::Ip(ip) => SocketAddr::new(*ip, port).to_string(),
             Self::Hostname(hostname) => format!("{hostname}:{port}"),
         }
+    }
+
+    /// Canonicalize first, so the v4-mapped spellings of one address
+    /// (`::ffff:10.0.0.1`, `::ffff:0.0.0.0`) are the same value as their v4
+    /// form for both the comparison and the wildcard refusal.
+    fn from_ip(ip: IpAddr) -> Result<Self, AdvertisedAddressError> {
+        let ip = ip.to_canonical();
+        if ip.is_unspecified() {
+            return Err(AdvertisedAddressError::Unspecified);
+        }
+        Ok(Self::Ip(ip))
     }
 }
 
@@ -705,7 +687,7 @@ impl FromStr for AdvertisedAddress {
             return Err(AdvertisedAddressError::Empty);
         }
         if let Ok(ip) = address.parse::<IpAddr>() {
-            return Ok(Self::Ip(ip));
+            return Self::from_ip(ip);
         }
         // URL-style bracketed IPv6 (`[2001:db8::1]`) is unambiguous; accept
         // it and store the inner address.
@@ -714,7 +696,7 @@ impl FromStr for AdvertisedAddress {
             .and_then(|rest| rest.strip_suffix(']'))
             && let Ok(ip) = inner.parse::<Ipv6Addr>()
         {
-            return Ok(Self::Ip(IpAddr::V6(ip)));
+            return Self::from_ip(IpAddr::V6(ip));
         }
         if let Some((host, port)) = address.rsplit_once(':') {
             // `host:port` and `[v6]:port` are the common misconfigurations;
@@ -778,6 +760,7 @@ impl fmt::Display for AdvertisedAddress {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AdvertisedAddressError {
     Empty,
+    Unspecified,
     PortNotAllowed,
     MalformedIpv4,
     MalformedIpv6,
@@ -792,6 +775,11 @@ impl fmt::Display for AdvertisedAddressError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Empty => write!(formatter, "address cannot be empty"),
+            Self::Unspecified => write!(
+                formatter,
+                "address is the unspecified address, which tells a client which interfaces this \
+                 node accepts on rather than where to reach it; declare a routable address"
+            ),
             Self::PortNotAllowed => write!(
                 formatter,
                 "address must not include a port; ports are configured in cluster.nodes.ports"
@@ -1565,18 +1553,44 @@ mod advertised_address_tests {
     }
 
     #[test]
-    fn reports_every_spelling_of_the_unspecified_address() {
-        for wildcard in ["0.0.0.0", "::", "::ffff:0.0.0.0"] {
-            let address = wildcard.parse::<AdvertisedAddress>().unwrap();
-            assert!(
-                address.is_unspecified(),
+    fn rejects_every_spelling_of_the_unspecified_address() {
+        for wildcard in [
+            "0.0.0.0",
+            "::",
+            "::ffff:0.0.0.0",
+            "[::]",
+            "[::ffff:0.0.0.0]",
+        ] {
+            assert_eq!(
+                wildcard.parse::<AdvertisedAddress>(),
+                Err(AdvertisedAddressError::Unspecified),
                 "'{wildcard}' names interfaces, not a dial target"
             );
         }
         for routable in ["203.0.113.1", "2001:db8::1", "::ffff:203.0.113.1", "broker"] {
-            let address = routable.parse::<AdvertisedAddress>().unwrap();
-            assert!(!address.is_unspecified(), "'{routable}' is dialable");
+            assert!(
+                routable.parse::<AdvertisedAddress>().is_ok(),
+                "'{routable}' is dialable"
+            );
         }
+    }
+
+    /// A v4-mapped IPv6 address and its v4 form are one address, so they must
+    /// be one value: the conflict pool compares advertised endpoints for
+    /// equality, and two spellings would let one host:port slip past it twice.
+    #[test]
+    fn canonicalizes_a_v4_mapped_address_to_its_v4_form() {
+        assert_eq!(
+            "::ffff:10.0.0.1".parse::<AdvertisedAddress>(),
+            "10.0.0.1".parse::<AdvertisedAddress>()
+        );
+        assert_eq!(
+            "::ffff:10.0.0.1"
+                .parse::<AdvertisedAddress>()
+                .unwrap()
+                .authority(8090),
+            "10.0.0.1:8090"
+        );
     }
 
     #[test]

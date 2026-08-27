@@ -43,19 +43,10 @@ impl Validatable<ConfigurationError> for NodeConfig {
             return Ok(());
         };
 
-        let parsed = address.parse::<AdvertisedAddress>().map_err(|error| {
+        address.parse::<AdvertisedAddress>().map_err(|error| {
             eprintln!("{COMPONENT} - node.advertised_address '{address}': {error}");
             ConfigurationError::InvalidConfigurationValue
         })?;
-
-        if parsed.is_unspecified() {
-            eprintln!(
-                "{COMPONENT} - node.advertised_address '{address}' is the unspecified address, \
-                 which tells a client which interfaces this node accepts on rather than where to \
-                 reach it; declare a routable address or leave it unset"
-            );
-            return Err(ConfigurationError::InvalidConfigurationValue);
-        }
 
         Ok(())
     }
