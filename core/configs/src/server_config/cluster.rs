@@ -497,7 +497,8 @@ impl TryFrom<ClusterNodeConfig> for ResolvedClusterNode {
         let replica_ip = config.ip.parse::<IpAddr>().map_err(|error| {
             eprintln!(
                 "Invalid cluster configuration: IP '{}' for node '{}' is not a literal IP \
-                 address: {error}",
+                 address: {error}; set cluster.nodes[*].advertised_address for the name clients \
+                 dial",
                 config.ip, config.name
             );
             ConfigurationError::InvalidConfigurationValue
@@ -1047,26 +1048,7 @@ impl Validatable<ConfigurationError> for ClusterConfig {
                 return Err(ConfigurationError::InvalidConfigurationValue);
             }
 
-            // The roster ip is dialed verbatim for replica traffic and is
-            // never resolved, so no hostname can work here whatever its
-            // shape.
-            let node_ip = node.ip.parse::<IpAddr>().map_err(|error| {
-                eprintln!(
-                    "Invalid cluster configuration: IP '{}' for node '{}' is not a literal IP \
-                     address: {error}; set node.advertised_address for the name clients dial",
-                    node.ip, node.name
-                );
-                ConfigurationError::InvalidConfigurationValue
-            })?;
-
-            if node_ip.to_canonical().is_unspecified() {
-                eprintln!(
-                    "Invalid cluster configuration: IP '{}' for node '{}' is the unspecified \
-                     address; declare the address peers and clients reach this node at",
-                    node.ip, node.name
-                );
-                return Err(ConfigurationError::InvalidConfigurationValue);
-            }
+            let resolved = ResolvedClusterNode::try_from(node.clone())?;
 
             if !seen_names.insert(node.name.clone()) {
                 eprintln!(
@@ -1110,8 +1092,12 @@ impl Validatable<ConfigurationError> for ClusterConfig {
                         return Err(ConfigurationError::InvalidConfigurationValue);
                     }
 
-                    let endpoint = format!("{}:{}", node.ip, port);
-                    if !used_endpoints.insert(endpoint.clone()) {
+                    // Keyed on the canonical form, and rendered from it, so
+                    // two spellings of one address ('::ffff:10.0.0.1' and
+                    // '10.0.0.1') cannot claim the same port twice and an IPv6
+                    // endpoint reads back with its port separable.
+                    let endpoint = SocketAddr::new(resolved.replica_ip().to_canonical(), port);
+                    if !used_endpoints.insert(endpoint) {
                         eprintln!(
                             "Invalid cluster configuration: port conflict - {endpoint} is already bound (node '{}', transport {name})",
                             node.name
@@ -1120,35 +1106,6 @@ impl Validatable<ConfigurationError> for ClusterConfig {
                     }
                 }
             }
-
-            // An advertised address must parse strictly (IP or RFC 1123
-            // hostname): the value is handed verbatim to every client via
-            // cluster metadata and redirect URLs, so a bad one poisons them
-            // all. It is the wider of the two - the roster `ip` above is
-            // held to a literal IP - so a node reachable only by name still
-            // publishes that name to clients.
-            let client_address = match node.advertised_address.as_deref() {
-                Some(advertised_address) => match advertised_address.parse::<AdvertisedAddress>() {
-                    Ok(address) if address.is_unspecified() => {
-                        eprintln!(
-                            "Invalid cluster configuration: advertised_address '{advertised_address}' for node '{}' \
-                             is the unspecified address, which tells a client which interfaces this node accepts \
-                             on rather than where to reach it; declare a routable address",
-                            node.name
-                        );
-                        return Err(ConfigurationError::InvalidConfigurationValue);
-                    }
-                    Ok(address) => Some(address),
-                    Err(error) => {
-                        eprintln!(
-                            "Invalid cluster configuration: advertised_address '{advertised_address}' for node '{}': {error}",
-                            node.name
-                        );
-                        return Err(ConfigurationError::InvalidConfigurationValue);
-                    }
-                },
-                None => node.ip.parse::<AdvertisedAddress>().ok(),
-            };
 
             if node.advertised_addresses.len() > MAX_ADVERTISED_SELECTORS {
                 eprintln!(
@@ -1160,53 +1117,20 @@ impl Validatable<ConfigurationError> for ClusterConfig {
                 return Err(ConfigurationError::InvalidConfigurationValue);
             }
 
-            // Selector CIDRs and addresses feed clients the same way the
-            // catch-all advertised address does, so they get the same strict
-            // parse. Networks are compared truncated (`10.0.1.0/16` ==
+            // Networks are compared truncated (`10.0.1.0/16` ==
             // `10.0.0.0/16`) and canonicalized (`::ffff:10.0.0.0/104` ==
-            // `10.0.0.0/8`) since matching truncates and canonicalizes too.
-            // Parsed before the catch-all enters the conflict pool because
-            // every entry's effective client set depends on the node's full
-            // selector list.
-            let mut selectors = Vec::with_capacity(node.advertised_addresses.len());
+            // `10.0.0.0/8`), the form resolution matched them in, so two
+            // spellings of one network cannot both be declared.
+            let selectors = &resolved.selectors;
             let mut seen_selector_cidrs = std::collections::HashSet::new();
-            for selector in &node.advertised_addresses {
-                let client_cidr = match selector.client_cidr.parse::<IpNet>() {
-                    Ok(client_cidr) => canonical_ip_net(client_cidr.trunc()),
-                    Err(error) => {
-                        eprintln!(
-                            "Invalid cluster configuration: advertised_addresses client_cidr '{}' for node '{}': {error}",
-                            selector.client_cidr, node.name
-                        );
-                        return Err(ConfigurationError::InvalidConfigurationValue);
-                    }
-                };
-                if !seen_selector_cidrs.insert(client_cidr) {
+            for ((client_cidr, _), declared) in selectors.iter().zip(&node.advertised_addresses) {
+                if !seen_selector_cidrs.insert(*client_cidr) {
                     eprintln!(
                         "Invalid cluster configuration: duplicate advertised_addresses client_cidr '{}' for node '{}'",
-                        selector.client_cidr, node.name
+                        declared.client_cidr, node.name
                     );
                     return Err(ConfigurationError::InvalidConfigurationValue);
                 }
-                let address = match selector.address.parse::<AdvertisedAddress>() {
-                    Ok(address) if address.is_unspecified() => {
-                        eprintln!(
-                            "Invalid cluster configuration: advertised_addresses address '{}' for node '{}' \
-                             is the unspecified address; declare the address clients in '{}' reach this node at",
-                            selector.address, node.name, selector.client_cidr
-                        );
-                        return Err(ConfigurationError::InvalidConfigurationValue);
-                    }
-                    Ok(address) => address,
-                    Err(error) => {
-                        eprintln!(
-                            "Invalid cluster configuration: advertised_addresses address '{}' for node '{}': {error}",
-                            selector.address, node.name
-                        );
-                        return Err(ConfigurationError::InvalidConfigurationValue);
-                    }
-                };
-                selectors.push((client_cidr, address));
             }
             let selector_ranges: Vec<ClientAddressRange> = selectors
                 .iter()
@@ -1222,22 +1146,20 @@ impl Validatable<ConfigurationError> for ClusterConfig {
             // means some client wins both entries and would resolve both
             // nodes to one endpoint. The catch-all is an implicit
             // match-everything-else selector, so it pools the same way.
-            if let Some(address) = &client_address {
-                let catch_all_clients = EffectiveClients::for_catch_all(&selector_ranges);
-                for (name, port) in &client_ports {
-                    if let Some(port) = port {
-                        insert_advertised_endpoint(
-                            &mut advertised_endpoints,
-                            AdvertisedEndpoint {
-                                node_name: &node.name,
-                                transport: name,
-                                network: None,
-                                clients: catch_all_clients.clone(),
-                                host: address.clone(),
-                                port: *port,
-                            },
-                        )?;
-                    }
+            let catch_all_clients = EffectiveClients::for_catch_all(&selector_ranges);
+            for (name, port) in &client_ports {
+                if let Some(port) = port {
+                    insert_advertised_endpoint(
+                        &mut advertised_endpoints,
+                        AdvertisedEndpoint {
+                            node_name: &node.name,
+                            transport: name,
+                            network: None,
+                            clients: catch_all_clients.clone(),
+                            host: resolved.catch_all.clone(),
+                            port: *port,
+                        },
+                    )?;
                 }
             }
 
