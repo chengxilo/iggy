@@ -1761,7 +1761,7 @@ fn build_cluster_roster(
     metadata_view: Arc<AtomicU64>,
 ) -> Result<ClusterRoster, ServerError> {
     let declared = config.node.advertised_address.as_deref();
-    let self_advertised = self_advertised_address(declared, topology.client_listen_addr.ip());
+    let self_advertised = self_advertised_address(declared, derived_bind_ip(topology, config));
     // The roster answers this per node, so a value here would be read by
     // nobody. Silence would leave the operator believing it took effect.
     // Every shard builds its own roster off the same config, so keep the
@@ -1778,7 +1778,10 @@ fn build_cluster_roster(
         nodes: resolved_roster_nodes(&config.cluster).map_err(ServerError::Config)?,
         self_advertised,
         self_ports: configs::cluster::TransportPorts {
-            tcp: Some(topology.client_listen_addr.port()),
+            tcp: config
+                .tcp
+                .enabled
+                .then(|| topology.client_listen_addr.port()),
             quic: topology.quic_listen_addr.map(|addr| addr.port()),
             http: topology.http_listen_addr.map(|addr| addr.port()),
             websocket: topology.ws_listen_addr.map(|addr| addr.port()),
@@ -3083,11 +3086,42 @@ fn merge_roster_port_with_bind_ip(
     listen_addr
 }
 
+/// The client-facing listeners paired with the config key naming their bind
+/// address, in the order [`ServerConfig::client_listeners`] derives the
+/// published client-facing address from them. `None` marks a listener that is
+/// switched off and therefore binds nothing.
+fn client_listeners(
+    topology: &TcpTopology,
+    config: &ServerConfig,
+) -> [(&'static str, Option<SocketAddr>); 4] {
+    [
+        (
+            "tcp.address",
+            config.tcp.enabled.then_some(topology.client_listen_addr),
+        ),
+        ("websocket.address", topology.ws_listen_addr),
+        ("quic.address", topology.quic_listen_addr),
+        ("http.address", topology.http_listen_addr),
+    ]
+}
+
+/// The bind interface the published client-facing address names when none is
+/// declared: the first enabled listener's, the same one boot validation gated
+/// its wildcard refusal on. With every client listener off nothing dials this
+/// node, so the tcp bind address stands in for an answer no client reads.
+fn derived_bind_ip(topology: &TcpTopology, config: &ServerConfig) -> IpAddr {
+    client_listeners(topology, config)
+        .into_iter()
+        .find_map(|(_, listen_addr)| listen_addr)
+        .unwrap_or(topology.client_listen_addr)
+        .ip()
+}
+
 /// Whether the address cluster metadata publishes for this node misses one of
-/// its own listeners. Only a derived address is judged: it names the
-/// `tcp.address` bind interface, so a listener on a different one is
-/// unreachable at the published address. A declared `node.advertised_address`
-/// is deliberate (NAT, a public name) and says nothing about which local
+/// its own listeners. Only a derived address is judged: it names one
+/// listener's bind interface, so a listener on a different one is unreachable
+/// at the published address. A declared `node.advertised_address` is
+/// deliberate (NAT, a public name) and says nothing about which local
 /// interface serves a transport, so it stays quiet.
 fn derived_address_misses_listener(
     declared: Option<&str>,
@@ -3109,6 +3143,18 @@ fn roster_ip_unreachable_from_bind_addr(roster_ip: &str, listen_addr: SocketAddr
         && roster_ip
             .parse::<IpAddr>()
             .is_ok_and(|parsed| parsed.to_canonical() != bind_ip)
+}
+
+fn wildcard_listener_under_loopback_address(
+    declared: Option<&str>,
+    self_advertised: &str,
+    listen_addr: SocketAddr,
+) -> bool {
+    declared.is_none()
+        && listen_addr.ip().to_canonical().is_unspecified()
+        && self_advertised
+            .parse::<IpAddr>()
+            .is_ok_and(|address| address.to_canonical().is_loopback())
 }
 
 fn resolve_cluster_replica_peers(
@@ -3167,28 +3213,38 @@ async fn start_tcp_runtime(
     }
 
     // Cluster metadata carries one host for all four transports, so a listener
-    // on another interface is unreachable at it. Only a derived address is
-    // judged; TCP is never judged even then, since the derived address is its
-    // own bind interface.
+    // the derived host does not reach is unreachable at it. Only a derived
+    // address is judged, and never against the listener it was derived from.
     let declared = config.node.advertised_address.as_deref();
-    let self_advertised = self_advertised_address(declared, topology.client_listen_addr.ip());
+    let self_advertised = self_advertised_address(declared, derived_bind_ip(topology, config));
     // A roster entry answers this per node in cluster mode, so the derived
     // address is never served and none of these listeners are judged against it.
-    if !config.cluster.enabled {
-        for (transport, listen_addr) in [
-            ("http", topology.http_listen_addr),
-            ("quic", topology.quic_listen_addr),
-            ("websocket", topology.ws_listen_addr),
-        ] {
-            let Some(listen_addr) = listen_addr else {
+    let listeners = client_listeners(topology, config);
+    if !config.cluster.enabled
+        && let Some(derived_from) = listeners
+            .iter()
+            .find_map(|(key, listen_addr)| listen_addr.map(|_| *key))
+    {
+        for (key, listen_addr) in listeners {
+            let Some(listen_addr) = listen_addr.filter(|_| key != derived_from) else {
                 continue;
             };
             if derived_address_misses_listener(declared, &self_advertised, listen_addr) {
                 warn!(
-                    "{transport} listener binds {listen_addr} but cluster metadata publishes \
-                     {self_advertised}, derived from tcp.address; a client reading that \
-                     metadata would not reach this listener. Set node.advertised_address to \
-                     the address clients dial."
+                    "{key} binds {listen_addr} but cluster metadata publishes {self_advertised}, \
+                     derived from {derived_from}; a client reading that metadata would not reach \
+                     this listener. Set node.advertised_address to the address clients dial."
+                );
+            } else if wildcard_listener_under_loopback_address(
+                declared,
+                &self_advertised,
+                listen_addr,
+            ) {
+                warn!(
+                    "{key} binds the wildcard {listen_addr} but cluster metadata publishes the \
+                     loopback {self_advertised}, derived from {derived_from}; a client reaching \
+                     this listener from another host is told an address that points back at \
+                     itself. Set node.advertised_address to the address clients dial."
                 );
             }
         }
@@ -5062,6 +5118,88 @@ mod tests {
             "broker-1.example.com",
             addr("10.0.0.5:3000")
         ));
+    }
+
+    #[test]
+    fn wildcard_listener_warns_only_under_a_derived_loopback_address() {
+        // Metadata says 127.0.0.1 while this listener takes connections from
+        // anywhere: whoever arrives from another host is told to dial itself.
+        assert!(wildcard_listener_under_loopback_address(
+            None,
+            "127.0.0.1",
+            addr("0.0.0.0:3000")
+        ));
+        assert!(wildcard_listener_under_loopback_address(
+            None,
+            "127.0.0.1",
+            addr("[::]:3000")
+        ));
+        // A published address that is reachable from elsewhere is what the
+        // wildcard listener wants, so there is nothing to say.
+        assert!(!wildcard_listener_under_loopback_address(
+            None,
+            "10.0.0.5",
+            addr("0.0.0.0:3000")
+        ));
+        // A concrete bind is the other warning's business, not this one's.
+        assert!(!wildcard_listener_under_loopback_address(
+            None,
+            "127.0.0.1",
+            addr("10.0.0.5:3000")
+        ));
+        // A declared address is deliberate; a loopback one is a local setup.
+        assert!(!wildcard_listener_under_loopback_address(
+            Some("127.0.0.1"),
+            "127.0.0.1",
+            addr("0.0.0.0:3000")
+        ));
+    }
+
+    #[test]
+    fn derived_bind_ip_follows_the_first_enabled_listener() {
+        let mut config: ServerConfig =
+            toml::from_str(include_str!("../config.toml")).expect("shipped config deserializes");
+        let topology = |ws: Option<&str>, http: Option<&str>| TcpTopology {
+            cluster_id: 0,
+            self_replica_id: 0,
+            replica_count: 1,
+            client_listen_addr: addr("127.0.0.1:8090"),
+            replica_listen_addr: None,
+            ws_listen_addr: ws.map(addr),
+            quic_listen_addr: None,
+            http_listen_addr: http.map(addr),
+            tcp_tls_listen_addr: None,
+            peers: Vec::new(),
+        };
+        let expected = |ip: &str| ip.parse::<IpAddr>().unwrap();
+
+        assert_eq!(
+            derived_bind_ip(
+                &topology(Some("10.0.0.5:8092"), Some("10.0.0.6:3000")),
+                &config
+            ),
+            expected("127.0.0.1")
+        );
+
+        config.tcp.enabled = false;
+        assert_eq!(
+            derived_bind_ip(
+                &topology(Some("10.0.0.5:8092"), Some("10.0.0.6:3000")),
+                &config
+            ),
+            expected("10.0.0.5"),
+            "websocket is next in line once tcp is off"
+        );
+        assert_eq!(
+            derived_bind_ip(&topology(None, Some("10.0.0.6:3000")), &config),
+            expected("10.0.0.6"),
+            "with websocket and quic off too, http answers"
+        );
+        assert_eq!(
+            derived_bind_ip(&topology(None, None), &config),
+            expected("127.0.0.1"),
+            "with every client listener off the value reaches no client anyway"
+        );
     }
 
     #[test]

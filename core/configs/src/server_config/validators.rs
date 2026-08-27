@@ -80,6 +80,7 @@ impl Validatable<ConfigurationError> for ServerConfig {
         self.node.validate().error(|e: &ConfigurationError| {
             format!("{COMPONENT} (error: {e}) - failed to validate node config")
         })?;
+        self.validate_tcp_bind_address()?;
         self.validate_client_facing_address()?;
         self.metadata.validate().error(|e: &ConfigurationError| {
             format!("{COMPONENT} (error: {e}) - failed to validate metadata config")
@@ -430,35 +431,51 @@ fn reject_unsupported(config: &ServerConfig) -> Result<(), ConfigurationError> {
 }
 
 impl ServerConfig {
-    /// `tcp.address` must name a bind address, and a wildcard one must be
-    /// paired with a declared client-facing address.
-    fn validate_client_facing_address(&self) -> Result<(), ConfigurationError> {
-        let bind = self.tcp.address.parse::<SocketAddr>().map_err(|error| {
-            eprintln!(
-                "{COMPONENT} - tcp.address '{}' is not an address and port: {error}. The host \
-                     is required and must be a literal IP, so ':PORT' and 'hostname:PORT' are \
-                     both rejected; use 127.0.0.1:PORT for loopback or 0.0.0.0:PORT to accept on \
-                     every interface.",
-                self.tcp.address
-            );
-            ConfigurationError::InvalidConfigurationValue
-        })?;
+    fn validate_tcp_bind_address(&self) -> Result<(), ConfigurationError> {
+        parse_bind_address("tcp.address", &self.tcp.address)?;
+        Ok(())
+    }
 
+    /// The listener the client-facing address is derived from must not bind a
+    /// wildcard unless that address is declared outright.
+    fn validate_client_facing_address(&self) -> Result<(), ConfigurationError> {
         if self.cluster.enabled || self.node.advertised_address.is_some() {
             return Ok(());
         }
+        // No client-facing listener runs, so no client dials this node and
+        // there is no address to demand.
+        let Some(listener) = self.derived_address_listener() else {
+            return Ok(());
+        };
+        let bind = parse_bind_address(listener.key, listener.address)?;
         if !bind.ip().to_canonical().is_unspecified() {
             return Ok(());
         }
 
         eprintln!(
-            "{COMPONENT} - tcp.address binds the wildcard {bind}, which says which interfaces this \
-             node accepts on rather than where a client reaches it, so cluster metadata would carry \
-             no address for this node. Set node.advertised_address to the address clients dial, or \
-             bind a concrete address."
+            "{COMPONENT} - {} binds the wildcard {bind}, which says which interfaces this node \
+             accepts on rather than where a client reaches it, so cluster metadata would carry no \
+             address for this node. Set node.advertised_address to the address clients dial, or \
+             bind a concrete address.",
+            listener.key
         );
         Err(ConfigurationError::InvalidConfigurationValue)
     }
+}
+
+/// A listener's bind address, which is a literal IP and a port and nothing
+/// else. `context` names the config key so the operator reads back the one
+/// they wrote.
+fn parse_bind_address(context: &str, address: &str) -> Result<SocketAddr, ConfigurationError> {
+    address.parse::<SocketAddr>().map_err(|error| {
+        eprintln!(
+            "{COMPONENT} - {context} '{address}' is not an address and port: {error}. The host \
+             is required and must be a literal IP, so ':PORT' and 'hostname:PORT' are both \
+             rejected; use 127.0.0.1:PORT for loopback or 0.0.0.0:PORT to accept on every \
+             interface."
+        );
+        ConfigurationError::InvalidConfigurationValue
+    })
 }
 
 #[cfg(test)]
@@ -544,6 +561,35 @@ mod tests {
     fn given_concrete_bind_without_advertised_address_when_validating_should_pass() {
         let config = config_with_override(
             "[tcp]\naddress = \"192.0.2.10:8090\"\n[cluster]\nenabled = false\n",
+        );
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn given_wildcard_bind_on_a_disabled_listener_when_validating_should_pass() {
+        let config = config_with_override(
+            "[tcp]\nenabled = false\naddress = \"0.0.0.0:8090\"\n[cluster]\nenabled = false\n",
+        );
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn given_wildcard_bind_on_the_first_enabled_listener_when_validating_should_reject() {
+        let config = config_with_override(
+            "[tcp]\nenabled = false\n[websocket]\nenabled = false\n[quic]\nenabled = false\n\
+             [http]\naddress = \"0.0.0.0:3000\"\n[cluster]\nenabled = false\n",
+        );
+        assert!(
+            config.validate().is_err(),
+            "an http-only server derives its address from http.address"
+        );
+    }
+
+    #[test]
+    fn given_every_client_listener_disabled_when_validating_should_pass() {
+        let config = config_with_override(
+            "[tcp]\nenabled = false\naddress = \"0.0.0.0:8090\"\n[websocket]\nenabled = false\n\
+             [quic]\nenabled = false\n[http]\nenabled = false\n[cluster]\nenabled = false\n",
         );
         assert!(config.validate().is_ok());
     }
