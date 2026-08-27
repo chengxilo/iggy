@@ -782,7 +782,8 @@ impl fmt::Display for AdvertisedAddressError {
             ),
             Self::PortNotAllowed => write!(
                 formatter,
-                "address must not include a port; ports are configured in cluster.nodes.ports"
+                "address must not include a port; each transport's port comes from its own \
+                 listener address in single-node mode and from cluster.nodes.ports in a cluster"
             ),
             Self::MalformedIpv4 => write!(
                 formatter,
