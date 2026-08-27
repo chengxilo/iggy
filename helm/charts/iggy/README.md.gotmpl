@@ -230,10 +230,12 @@ Ensure the server binds to `0.0.0.0` instead of `127.0.0.1`. This is configured 
 
 A wildcard bind says which interfaces accept connections, not where clients
 reach the pod, so the server also needs the address to publish in cluster
-metadata and refuses to start without it. The chart sets
-`IGGY_NODE_ADVERTISED_ADDRESS` to the in-cluster Service DNS name; override it
-with `server.advertisedAddress` when clients arrive through a LoadBalancer or
-an Ingress.
+metadata. Server builds that carry the setting refuse to start without it;
+older ones, including the `0.7.0` this chart pins by default, have no such
+refusal and log the variable as unknown and ignored. Either way the chart
+sets `IGGY_NODE_ADVERTISED_ADDRESS` to the in-cluster Service DNS name;
+override it with `server.advertisedAddress` when clients arrive through a
+LoadBalancer or an Ingress.
 
 Declaring `IGGY_NODE_ADVERTISED_ADDRESS` in `server.env` yourself works too:
 the chart then leaves its own default out, so the variable is declared once.
