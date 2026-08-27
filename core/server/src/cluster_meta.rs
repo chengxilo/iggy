@@ -46,9 +46,11 @@ const SINGLE_NODE_CLUSTER_NAME: &str = "single-node";
 
 /// Client-facing host for the cluster-disabled single node, normalized the way
 /// [`client_host`] normalizes the roster path so one address cannot publish in
-/// two spellings. Normalizing matters beyond tidiness: a declared
-/// `[2001:db8::1]` published verbatim is bracketed a second time when a client
-/// joins it to a port, yielding an address that no longer parses.
+/// two spellings. Normalizing matters beyond tidiness: an SDK that brackets an
+/// IPv6 host before joining it to the port brackets a declared `[2001:db8::1]`
+/// a second time unless it guards on a leading '[', yielding an address that no
+/// longer parses. Go's `net.JoinHostPort` keys on the colon alone, so it is the
+/// one that does.
 ///
 /// `NodeConfig::validate` has already accepted `declared`, so the parse only
 /// fails on a caller that skipped validation; such a value is passed through
