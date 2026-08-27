@@ -22,9 +22,8 @@
 //! and a bind address answers which interfaces it accepts on - never where a
 //! client reaches it. Behind any NAT (published container ports, a Service, a
 //! load balancer) the two are different addresses, and this setting is the
-//! only way to state the second one. The bind-derived fallback and the empty
-//! answer for a wildcard bind are pinned at unit level (`cluster_meta.rs`)
-//! and across the SDKs in `bdd/`; what needs a real server is that a declared
+//! only way to state the second one. The bind-derived fallback is pinned at
+//! unit level (`cluster_meta.rs`); what needs a real server is that a declared
 //! address survives config load and reaches the wire.
 
 use iggy::prelude::*;
@@ -62,9 +61,9 @@ async fn given_a_declared_advertised_address_when_getting_cluster_metadata_shoul
         1,
         "a cluster-disabled server reports itself alone, got {metadata}"
     );
-    assert!(
-        !metadata.name.is_empty(),
-        "the single-node label still names the cluster"
+    assert_eq!(
+        metadata.name, "single-node",
+        "a cluster-disabled server reports the single-node label, got {metadata}"
     );
     let node = &metadata.nodes[0];
     // The harness binds a concrete loopback address, so this also pins the
