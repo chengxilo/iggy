@@ -237,6 +237,8 @@ an Ingress.
 
 Declaring `IGGY_NODE_ADVERTISED_ADDRESS` in `server.env` yourself works too:
 the chart then leaves its own default out, so the variable is declared once.
+Give that entry a non-empty value; an empty one suppresses the chart default
+and reaches the server as unset, so the render fails instead.
 Setting it in `server.env` and in `server.advertisedAddress` at the same time
 is refused at render time rather than resolved silently, since only the
 `server.env` entry would take effect.
