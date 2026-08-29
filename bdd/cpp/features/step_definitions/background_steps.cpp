@@ -29,6 +29,7 @@
 #include <cstdlib>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 #include "world.hpp"
 
@@ -46,8 +47,12 @@ std::string required_env(const char *name) {
 GIVEN("^I have a running Iggy server$") {
     cucumber::ScenarioScope<bdd::GlobalContext> context;
 
+    // Empty address makes the SDK fall back to its default TCP endpoint; in CI the address
+    // is supplied via IGGY_TCP_ADDRESS (e.g. iggy-server:8090).
     const std::string address = required_env("IGGY_TCP_ADDRESS");
-    iggy::ffi::Client *client = iggy::ffi::new_connection(address);
+    iggy::ffi::IggyClientConfig config{};
+    config.server_address     = address;
+    iggy::ffi::Client *client = iggy::ffi::new_connection(std::move(config));
     ASSERT_NE(client, nullptr);
     context->client = client;
     context->client->connect();
