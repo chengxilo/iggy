@@ -14,7 +14,6 @@
 // KIND, either express or implied.  See the License for the
 // specific language governing permissions and limitations
 // under the License.
-//
 
 // A default here would turn a dropped compose variable into a run against
 // whatever happens to listen on the fallback address, so a missing value

@@ -17,7 +17,6 @@
 
 use crate::helpers::env::{follower_address, leader_address, server_address};
 use iggy::prelude::*;
-use std::env;
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::sync::Arc;
 
