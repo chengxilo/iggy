@@ -20,20 +20,13 @@ package tests
 import (
 	"context"
 	"fmt"
-	"os"
 
+	"github.com/apache/iggy/bdd/go/tests/env"
 	"github.com/apache/iggy/foreign/go/client"
 	"github.com/apache/iggy/foreign/go/client/tcp"
 	iggcon "github.com/apache/iggy/foreign/go/contracts"
 	"github.com/google/uuid"
 )
-
-func defaultServerAddress() string {
-	if addr := os.Getenv("IGGY_TCP_ADDRESS"); addr != "" {
-		return addr
-	}
-	return "127.0.0.1:8090"
-}
 
 func connectToServer(ctx context.Context, addr string) (iggcon.Client, error) {
 	cli, err := client.NewIggyClient(
@@ -54,7 +47,8 @@ func connectToServer(ctx context.Context, addr string) (iggcon.Client, error) {
 }
 
 func loginAsRoot(ctx context.Context, cli iggcon.Client) error {
-	if _, err := cli.LoginUser(ctx, "iggy", "iggy"); err != nil {
+	username, password := env.RootCredentials()
+	if _, err := cli.LoginUser(ctx, username, password); err != nil {
 		return fmt.Errorf("error logging in: %w", err)
 	}
 	return nil

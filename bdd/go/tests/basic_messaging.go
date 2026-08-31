@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/apache/iggy/bdd/go/tests/env"
 	iggcon "github.com/apache/iggy/foreign/go/contracts"
 	"github.com/cucumber/godog"
 )
@@ -48,7 +49,7 @@ type basicMessagingSteps struct{}
 
 func (s basicMessagingSteps) givenRunningServer(ctx context.Context) error {
 	c := getBasicMessagingCtx(ctx)
-	addr := defaultServerAddress()
+	addr := env.ServerAddress()
 	c.serverAddr = &addr
 	return nil
 }
