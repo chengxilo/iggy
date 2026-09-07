@@ -339,7 +339,7 @@ public class HttpMessageStream : IIggyClient
 
             if (MessageEncryptor is not null)
             {
-                DecryptMessages(pollMessages.Messages, (uint)pollMessages.PartitionId);
+                DecryptMessages(pollMessages.Messages, pollMessages.PartitionId);
             }
 
             return pollMessages;
@@ -999,11 +999,11 @@ public class HttpMessageStream : IIggyClient
         var partition = partitioning.Kind switch
         {
             Enums.Partitioning.Balanced => _groupState.NextBalancedPartition(key, partitionCount.Value),
-            Enums.Partitioning.MessageKey => XxHash32.HashToUInt32(partitioning.Value) % partitionCount.Value,
+            Enums.Partitioning.MessageKey => XxHash32.HashToUInt32(partitioning.Bytes) % partitionCount.Value,
             _ => throw new FeatureUnavailableException()
         };
 
-        return Partitioning.PartitionId((int)partition);
+        return Partitioning.PartitionId(partition);
     }
 
     private void DecryptMessages(IReadOnlyList<MessageResponse> messages, uint partitionId)
