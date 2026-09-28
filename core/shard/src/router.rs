@@ -27,6 +27,7 @@ use iggy_binary_protocol::{Command, ConsensusError, GenericHeader, Operation, Pr
 use journal::superblock::SuperblockStore;
 use journal::{Journal, JournalHandle};
 use message_bus::{ConnectionInstaller, MessageBus, ReplicaHandshakeDoneFn};
+use metadata::stm::stream::PartitionIdentity;
 use partitions::FatalCommit;
 use server_common::sharding::{IggyNamespace, METADATA_GROUP};
 use server_common::{Message, MessageBag};
@@ -920,14 +921,30 @@ where
                     }
                 }
             }
-            LifecycleFrame::TruncatePartition {
-                namespace,
-                up_to_offset,
-            } => {
-                // Pump-side enforcement of a committed delete watermark. The
-                // committed offset is identical on every replica, so the local
-                // deletion converges; idempotent if already trimmed past it.
+            LifecycleFrame::TruncatePartition { namespace } => {
+                let Some((identity, up_to_offset)) = self
+                    .plane
+                    .metadata()
+                    .mux_stm
+                    .streams()
+                    .with_committed_partition(namespace, |partition| {
+                        (
+                            PartitionIdentity::from(partition),
+                            partition.deleted_up_to_offset,
+                        )
+                    })
+                else {
+                    return;
+                };
+                if up_to_offset == 0
+                    || Some(identity.created_revision) != self.shards_table.epoch_for(namespace)
+                {
+                    return;
+                }
                 if let Some(partition) = self.plane.partitions().get_mut_by_ns(&namespace) {
+                    if identity.purge_generation != partition.applied_purge_generation() {
+                        return;
+                    }
                     let removal = partition.remove_sealed_segments_up_to(up_to_offset).await;
                     if removal.segments > 0 {
                         // See the cleaner arm: a truncate commits on the

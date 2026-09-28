@@ -1400,7 +1400,7 @@ fn reconcile_segment_truncations(ctx: &ReconcilerCtx, counters: &mut PassCounter
         if watermark == 0 {
             continue;
         }
-        ctx.shard.request_truncate_partition(namespace, watermark);
+        ctx.shard.request_truncate_partition(namespace);
         let trimmed = partitions
             .get_by_ns(&namespace)
             .and_then(|partition| partition.log.segments().first())

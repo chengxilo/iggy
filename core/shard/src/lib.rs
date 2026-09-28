@@ -65,6 +65,7 @@ use message_bus::{BusMessage, MessageBus, SharedTlsServerConfig};
 use metadata::IggyMetadata;
 use metadata::impls::metadata::StreamsFrontend;
 use metadata::stm::StateMachine;
+use metadata::stm::stream::PartitionIdentity;
 use metadata::{BoundSession, MetadataSubmitError};
 use partitions::state_transfer::TransferArtifact;
 use partitions::{
@@ -410,6 +411,7 @@ pub enum PartitionReadReply {
     SegmentDeleteOffset {
         up_to_offset: Option<u64>,
         lagging: bool,
+        identity: PartitionIdentity,
     },
     /// The owning shard has no materialised partition for the namespace
     /// (unknown, tombstoned, or mid-reconcile). Callers surface an error
@@ -817,12 +819,10 @@ pub enum LifecycleFrame {
         max_bytes: Option<u64>,
     },
     /// Reconciler-staged enforcement of a committed `TruncatePartition`
-    /// watermark: delete sealed segments up to `up_to_offset` on the pump,
-    /// serialized with reads. Each replica applies the committed offset
-    /// locally and idempotently.
+    /// watermark. The pump reads the current metadata so queued work cannot
+    /// carry an old offset past a purge or partition recreation.
     TruncatePartition {
         namespace: IggyNamespace,
-        up_to_offset: u64,
     },
     /// Reconciler-staged enforcement of a committed `PurgeTopic`: reset the
     /// partition to a single empty segment at offset 0 and clear consumer
@@ -2502,16 +2502,13 @@ where
         }
     }
 
-    /// Stage a `TruncatePartition` enforcement for `namespace` on this shard's
-    /// pump: delete sealed segments up to `up_to_offset`. The reconciler calls
-    /// this after observing a committed delete watermark for an owned partition.
-    pub fn request_truncate_partition(&self, namespace: IggyNamespace, up_to_offset: u64) {
+    /// Ask this shard's pump to enforce the namespace's current delete watermark.
+    pub fn request_truncate_partition(&self, namespace: IggyNamespace) {
         let Some(sender) = self.senders.get(self.id as usize) else {
             return;
         };
         let _ = sender.try_send(ShardFrame::lifecycle(LifecycleFrame::TruncatePartition {
             namespace,
-            up_to_offset,
         }));
     }
 

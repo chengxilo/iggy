@@ -38,12 +38,16 @@ use metadata::IggyMetadata;
 use metadata::impls::metadata::{IggySnapshot, StreamsFrontend};
 use metadata::stm::StateMachine;
 use metadata::stm::consumer_group::{ConsumerGroup, ConsumerGroupMember, JoinConsumerGroupRequest};
-use metadata::stm::stream::{Partition, Stream, StreamsInner, Topic};
+use metadata::stm::stream::{
+    Partition, PartitionIdentity, Stream, StreamsInner, Topic, TruncatePartitionRequest,
+};
 use metadata::stm::user::Users;
-use partitions::{IggyPartitions, PartitionsConfig, PollingArgs, PollingConsumer};
-use server_common::Message;
+use partitions::{
+    IggyPartition, IggyPartitions, PartitionsConfig, PollingArgs, PollingConsumer, Segment,
+};
 use server_common::send_messages::decode_batch_slice;
 use server_common::sharding::{IggyNamespace, PartitionLocation, ShardId};
+use server_common::{Message, SegmentStorage};
 
 use super::test_support::{PollTestMetadata, partition_with_messages};
 use crate::metrics::ShardMetrics;
@@ -449,6 +453,7 @@ async fn given_committed_purge_when_reading_offsets_should_reject_until_applied(
             partition.consensus().advance_commit_max(op);
             partition.commit_journal(&config).await;
         }
+        seal_fixture_segment(&mut partition, &config, OLD_OFFSET);
 
         let mut inner = StreamsInner::default();
         let mut stream = Stream::default();
@@ -506,6 +511,7 @@ async fn given_committed_purge_when_reading_offsets_should_reject_until_applied(
                 PartitionRead::GroupOffsetState {
                     group_id: u64::from(CONSUMER_ID),
                 },
+                PartitionRead::ResolveSegmentDeleteOffset { count: 1 },
             ] {
                 let (reply, replies) = channel(1);
                 owner.on_partition_read(namespace, read, reply).await;
@@ -532,12 +538,169 @@ async fn given_committed_purge_when_reading_offsets_should_reject_until_applied(
                         assert_eq!(last_polled, None);
                         assert_eq!(committed, expected, "{operation:?}: {phase:?}");
                     }
+                    PartitionReadReply::SegmentDeleteOffset {
+                        up_to_offset,
+                        lagging,
+                        identity,
+                    } => {
+                        assert_eq!(up_to_offset, expected, "{operation:?}: {phase:?}");
+                        assert!(!lagging);
+                        assert_eq!(identity.created_revision, 0);
+                        assert_eq!(
+                            identity.purge_generation,
+                            u64::from(matches!(phase, Phase::Applied))
+                        );
+                    }
                     other => panic!("{operation:?}: {phase:?} should serve offsets, got {other:?}"),
                 }
             }
         }
         drop(owner);
         std::fs::remove_dir_all(directory).unwrap();
+    }
+}
+
+#[compio::test]
+async fn given_queued_truncate_when_purge_applies_should_preserve_new_segments() {
+    const SEGMENT_END: u64 = 1;
+    for (operation, body) in [
+        (
+            Operation::PurgeTopic,
+            PurgeTopicRequest {
+                stream_id: WireIdentifier::numeric(0),
+                topic_id: WireIdentifier::numeric(0),
+            }
+            .to_bytes(),
+        ),
+        (
+            Operation::PurgeStream,
+            PurgeStreamRequest {
+                stream_id: WireIdentifier::numeric(0),
+            }
+            .to_bytes(),
+        ),
+    ] {
+        let namespace = IggyNamespace::new(0, 0, 0);
+        let bus = Rc::new(IggyMessageBus::new(0));
+        let (mut partition, config) =
+            partition_with_messages(&bus, namespace, &["old zero", "old one"]).await;
+        seal_fixture_segment(&mut partition, &config, SEGMENT_END);
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let directory = std::env::temp_dir().join(format!(
+            "iggy-purge-queued-trim-{}-{unique}",
+            std::process::id()
+        ));
+        std::fs::create_dir(&directory).unwrap();
+        partition.set_partition_dir(directory.to_string_lossy().into_owned());
+        let mut inner = StreamsInner::default();
+        let mut stream = Stream::default();
+        let mut topic = Topic::default();
+        topic.partitions.push(Partition::new(
+            0,
+            namespace.inner(),
+            IggyTimestamp::default(),
+            0,
+            0,
+        ));
+        stream.topics.insert(topic);
+        inner.items.insert(stream);
+        let metadata = PollTestMetadata::new((Users::default(), (inner.into(), ())));
+        let (owner, _sender) = owner_with_metadata(&bus, config.clone(), namespace, metadata);
+        owner.plane.partitions().insert(namespace, partition);
+        let truncate = TruncatePartitionRequest {
+            stream_id: WireIdentifier::numeric(0),
+            topic_id: WireIdentifier::numeric(0),
+            partition_id: 0,
+            up_to_offset: SEGMENT_END,
+            identity: Some(PartitionIdentity {
+                created_revision: 0,
+                purge_generation: 0,
+            }),
+        };
+        apply_poll_metadata(&owner, Operation::TruncatePartition, truncate.to_bytes());
+        owner.request_truncate_partition(namespace);
+        assert_eq!(owner.inbox_len(), 1);
+
+        apply_poll_metadata(&owner, operation, &body);
+        let partition = owner.plane.partitions().get_mut_by_ns(&namespace).unwrap();
+        partition.request_purge(1).await;
+        let barrier = partition.consensus().sequencer().current_sequence();
+        partition.consensus().advance_commit_max(barrier);
+        partition.commit_journal(&config).await;
+        assert!(
+            partition.fatal().is_none(),
+            "purge failed: {:?}",
+            partition.fatal()
+        );
+        assert_eq!(partition.applied_purge_generation(), 1);
+        seal_fixture_segment(partition, &config, SEGMENT_END);
+        partition.stats.increment_messages_count(SEGMENT_END + 1);
+
+        drain_owner_frames(&owner, namespace).await;
+        assert_eq!(
+            owner
+                .plane
+                .partitions()
+                .get_by_ns(&namespace)
+                .unwrap()
+                .log
+                .segments()
+                .len(),
+            2,
+            "{operation:?}: a trim queued before the purge deleted new segments"
+        );
+
+        let fresh = TruncatePartitionRequest {
+            identity: Some(PartitionIdentity {
+                created_revision: 0,
+                purge_generation: 1,
+            }),
+            ..truncate
+        };
+        apply_poll_metadata(&owner, Operation::TruncatePartition, fresh.to_bytes());
+        owner.request_truncate_partition(namespace);
+        drain_owner_frames(&owner, namespace).await;
+        let partition = owner.plane.partitions().get_by_ns(&namespace).unwrap();
+        assert_eq!(
+            partition.log.segments().len(),
+            1,
+            "fresh truncates must still apply"
+        );
+        assert_eq!(partition.log.segments()[0].start_offset, SEGMENT_END + 1);
+        drop(owner);
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+}
+
+fn seal_fixture_segment(
+    partition: &mut IggyPartition<Rc<IggyMessageBus>>,
+    config: &PartitionsConfig,
+    end_offset: u64,
+) {
+    partition.log.active_segment_mut().end_offset = end_offset;
+    partition.log.active_segment_mut().sealed = true;
+    partition.log.add_persisted_segment(
+        Segment::new(end_offset + 1, config.segment_size),
+        SegmentStorage::default(),
+        None,
+        None,
+    );
+    partition.stats.increment_segments_count(1);
+}
+
+#[allow(clippy::future_not_send)]
+async fn drain_owner_frames(owner: &CompletionTestShard, namespace: IggyNamespace) {
+    let (_stop_sender, stop_receiver) = channel(1);
+    let read = Box::pin(owner.partition_read(namespace, PartitionRead::Primary));
+    let pump = Box::pin(owner.run_message_pump(stop_receiver, Arc::new(AtomicBool::new(false))));
+    match futures::future::select(read, pump).await {
+        futures::future::Either::Left((reply, _pump)) => {
+            assert!(matches!(reply, Some(PartitionReadReply::Primary(_))));
+        }
+        futures::future::Either::Right((fault, _read)) => panic!("pump stopped: {fault:?}"),
     }
 }
 
