@@ -1193,7 +1193,9 @@ where
 
     const fn requires_persistence(&self, operation: Operation) -> bool {
         match operation {
-            Operation::PurgePartition => true,
+            Operation::PurgePartition => {
+                self.durability().is_persisted() || self.consumer_offset_durability().is_persisted()
+            }
             Operation::SendMessages => self.durability().is_persisted(),
             Operation::StoreConsumerOffset | Operation::DeleteConsumerOffset => {
                 self.consumer_offset_durability().is_persisted()
@@ -8406,6 +8408,15 @@ where
             }
         }
         if let Some(conclusion) = self.repair_persistence_pending(session) {
+            if conclusion == RepairConclusion::InProgress
+                && self
+                    .persistence
+                    .as_ref()
+                    .is_some_and(|persistence| persistence.is_durable_through(persistence.head()))
+            {
+                // A committed purge must apply before repair can admit its suffix.
+                self.commit_journal(config).await;
+            }
             return conclusion;
         }
         let before = self.consensus().commit_min();
@@ -10057,6 +10068,104 @@ mod tests {
     }
 
     #[compio::test]
+    async fn given_replicated_partition_when_purged_should_commit_through_replica_acknowledgments()
+    {
+        const REPLICA_COUNT: u8 = 3;
+        const PURGE_GENERATION: u64 = 1;
+        for (durability, offset_durability) in [
+            (
+                iggy_common::Durability::Replicated,
+                iggy_common::Durability::Replicated,
+            ),
+            (
+                iggy_common::Durability::Persisted,
+                iggy_common::Durability::Replicated,
+            ),
+            (
+                iggy_common::Durability::Replicated,
+                iggy_common::Durability::Persisted,
+            ),
+        ] {
+            let directories: Vec<_> = (0..REPLICA_COUNT)
+                .map(|_| tempfile::tempdir().unwrap())
+                .collect();
+            let mut replicas = Vec::with_capacity(usize::from(REPLICA_COUNT));
+            for replica in 0..REPLICA_COUNT {
+                let (mut partition, _) = recording_partition_at(replica, REPLICA_COUNT);
+                partition.set_partition_dir(
+                    directories[usize::from(replica)]
+                        .path()
+                        .to_string_lossy()
+                        .into_owned(),
+                );
+                partition.runtime_options.durability = durability;
+                partition.runtime_options.consumer_offset_durability = offset_durability;
+                partition.open_persistence().await.unwrap();
+                assert_eq!(
+                    partition.persistence.is_some(),
+                    durability.is_persisted() || offset_durability.is_persisted(),
+                );
+                replicas.push(partition);
+            }
+
+            replicas[0].request_purge(PURGE_GENERATION).await;
+            let purge_op = replicas[0].consensus().sequencer().current_sequence();
+            let prepare = replicas[0]
+                .log
+                .journal()
+                .inner
+                .repair_entry(purge_op)
+                .unwrap();
+            for replica in replicas.iter_mut().skip(1) {
+                let mut message = Message::<PrepareHeader>::new(prepare.len());
+                message.as_mut_slice().copy_from_slice(prepare.as_slice());
+                replica.on_replicate(message).await;
+            }
+
+            let mut acknowledgments = Vec::with_capacity(usize::from(REPLICA_COUNT));
+            for replica in &mut replicas {
+                if let Some(persistence) = &replica.persistence {
+                    persistence.drain_with_timeout().await.unwrap();
+                }
+                replica.drive_persistence().await;
+                let mut loopback = Vec::new();
+                replica.consensus().drain_loopback_into(&mut loopback);
+                acknowledgments.extend(loopback.into_iter().map(Message::into_frozen));
+                acknowledgments.extend(
+                    replica
+                        .consensus()
+                        .message_bus()
+                        .sent_to_replicas
+                        .borrow()
+                        .iter()
+                        .filter_map(|(_, frame)| {
+                            bytemuck::checked::try_from_bytes::<PrepareOkHeader>(frame.as_slice())
+                                .ok()
+                                .filter(|header| header.command == Command::PrepareOk)
+                                .map(|_| frame.clone())
+                        }),
+                );
+            }
+            assert_eq!(
+                acknowledgments.len(),
+                usize::from(REPLICA_COUNT),
+                "every replica must acknowledge the purge under {durability:?}/{offset_durability:?}",
+            );
+            let config = repair_config();
+            for acknowledgment in acknowledgments {
+                let mut message = Message::<PrepareOkHeader>::new(acknowledgment.len());
+                message
+                    .as_mut_slice()
+                    .copy_from_slice(acknowledgment.as_slice());
+                replicas[0].on_ack(message, &config).await;
+            }
+            assert_eq!(replicas[0].applied_purge_generation(), PURGE_GENERATION);
+            assert_eq!(replicas[0].consensus().commit_min(), purge_op);
+            assert!(replicas[0].fatal.is_none());
+        }
+    }
+
+    #[compio::test]
     async fn given_durable_purge_when_reopened_should_recover_its_committed_boundary() {
         let directory = tempfile::tempdir().unwrap();
         let (mut partition, _) = recording_partition_at(0, 3);
@@ -10091,108 +10200,152 @@ mod tests {
     async fn given_primary_elect_missing_a_purge_when_repairing_should_apply_it_before_the_suffix()
     {
         const ELECTED_VIEW: u32 = 3;
-        let config = repair_config();
-        let source_directory = tempfile::tempdir().unwrap();
-        let receiver_directory = tempfile::tempdir().unwrap();
-        let (mut source, _) = recording_partition_at(0, 3);
-        source.set_partition_dir(source_directory.path().to_string_lossy().into_owned());
-        let old = source
-            .apply_replicated_operation(checksummed_segment_prepare(1, 0, 0, b"old"))
-            .await
-            .unwrap();
-        let old_header = *bytemuck::checked::from_bytes::<PrepareHeader>(
-            &old.as_slice()[..size_of::<PrepareHeader>()],
-        );
-        source.consensus().sequencer().set_sequence(1);
-        source
-            .consensus()
-            .set_last_prepare_checksum(old_header.checksum);
-        source.consensus().advance_commit_max(1);
-        source.commit_journal(&config).await;
-        source.request_purge(1).await;
-        let barrier = source.log.journal().inner.repair_entry(2).unwrap();
-        let barrier_header = *bytemuck::checked::from_bytes::<PrepareHeader>(
-            &barrier.as_slice()[..size_of::<PrepareHeader>()],
-        );
-        source.consensus().advance_commit_max(2);
-        source.commit_journal(&config).await;
-        let fresh = source
-            .apply_replicated_operation(checksummed_segment_prepare(
-                3,
-                barrier_header.checksum,
-                0,
-                b"new",
-            ))
-            .await
-            .unwrap();
-        let fresh_header = *bytemuck::checked::from_bytes::<PrepareHeader>(
-            &fresh.as_slice()[..size_of::<PrepareHeader>()],
-        );
+        for durability in [
+            iggy_common::Durability::Replicated,
+            iggy_common::Durability::Persisted,
+        ] {
+            let config = repair_config();
+            let source_directory = tempfile::tempdir().unwrap();
+            let receiver_directory = tempfile::tempdir().unwrap();
+            let (mut source, _) = recording_partition_at(0, 3);
+            source.set_partition_dir(source_directory.path().to_string_lossy().into_owned());
+            let old = source
+                .apply_replicated_operation(checksummed_segment_prepare(1, 0, 0, b"old"))
+                .await
+                .unwrap();
+            let old_header = *bytemuck::checked::from_bytes::<PrepareHeader>(
+                &old.as_slice()[..size_of::<PrepareHeader>()],
+            );
+            source.consensus().sequencer().set_sequence(1);
+            source
+                .consensus()
+                .set_last_prepare_checksum(old_header.checksum);
+            source.consensus().advance_commit_max(1);
+            source.commit_journal(&config).await;
+            source.request_purge(1).await;
+            let barrier = source.log.journal().inner.repair_entry(2).unwrap();
+            let barrier_header = *bytemuck::checked::from_bytes::<PrepareHeader>(
+                &barrier.as_slice()[..size_of::<PrepareHeader>()],
+            );
+            source.consensus().advance_commit_max(2);
+            source.commit_journal(&config).await;
+            let fresh = source
+                .apply_replicated_operation(checksummed_segment_prepare(
+                    3,
+                    barrier_header.checksum,
+                    0,
+                    b"new",
+                ))
+                .await
+                .unwrap();
+            let fresh_header = *bytemuck::checked::from_bytes::<PrepareHeader>(
+                &fresh.as_slice()[..size_of::<PrepareHeader>()],
+            );
 
-        let (mut receiver, _) = recording_partition_at(0, 3);
-        receiver.set_partition_dir(receiver_directory.path().to_string_lossy().into_owned());
-        let group = receiver.namespace().inner();
-        let svc = Message::<StartViewChangeHeader>::new(size_of::<StartViewChangeHeader>())
-            .transmute_header(|_, header: &mut StartViewChangeHeader| {
-                header.command = Command::StartViewChange;
+            let (mut receiver, _) = recording_partition_at(0, 3);
+            receiver.set_partition_dir(receiver_directory.path().to_string_lossy().into_owned());
+            receiver.runtime_options.durability = durability;
+            receiver.log.retire_front().unwrap();
+            receiver.install_empty_segment(&config, 0).await.unwrap();
+            receiver.open_persistence().await.unwrap();
+            let group = receiver.namespace().inner();
+            let svc = Message::<StartViewChangeHeader>::new(size_of::<StartViewChangeHeader>())
+                .transmute_header(|_, header: &mut StartViewChangeHeader| {
+                    header.command = Command::StartViewChange;
+                    header.cluster = TEST_CLUSTER;
+                    header.group = group;
+                    header.view = ELECTED_VIEW;
+                    header.replica = 1;
+                    header.size = u32::try_from(size_of::<StartViewChangeHeader>()).unwrap();
+                });
+            receiver
+                .consensus()
+                .handle_start_view_change(PlaneKind::Partitions, svc.header());
+            let header_size = size_of::<DoViewChangeHeader>();
+            let size = header_size + size_of::<PrepareHeader>();
+            let mut dvc = Message::<DoViewChangeHeader>::new(size);
+            dvc.as_mut_slice()[header_size..].copy_from_slice(bytemuck::bytes_of(&fresh_header));
+            let dvc = dvc.transmute_header(|_, header: &mut DoViewChangeHeader| {
+                header.command = Command::DoViewChange;
                 header.cluster = TEST_CLUSTER;
                 header.group = group;
                 header.view = ELECTED_VIEW;
-                header.replica = 1;
-                header.size = u32::try_from(size_of::<StartViewChangeHeader>()).unwrap();
+                header.replica = 2;
+                header.op = 3;
+                header.commit = 3;
+                header.present_bitset = 1;
+                header.size = u32::try_from(size).unwrap();
             });
-        receiver
-            .consensus()
-            .handle_start_view_change(PlaneKind::Partitions, svc.header());
-        let header_size = size_of::<DoViewChangeHeader>();
-        let size = header_size + size_of::<PrepareHeader>();
-        let mut dvc = Message::<DoViewChangeHeader>::new(size);
-        dvc.as_mut_slice()[header_size..].copy_from_slice(bytemuck::bytes_of(&fresh_header));
-        let dvc = dvc.transmute_header(|_, header: &mut DoViewChangeHeader| {
-            header.command = Command::DoViewChange;
-            header.cluster = TEST_CLUSTER;
-            header.group = group;
-            header.view = ELECTED_VIEW;
-            header.replica = 2;
-            header.op = 3;
-            header.commit = 3;
-            header.present_bitset = 1;
-            header.size = u32::try_from(size).unwrap();
-        });
-        receiver.consensus().handle_do_view_change(
-            PlaneKind::Partitions,
-            dvc.header(),
-            &dvc.as_slice()[header_size..],
-        );
-        assert!(receiver.consensus().view_log_is_pending());
-        assert!(!receiver.consensus().is_normal());
-        let mut session = armed_session(3, 0, None);
-        session.view = ELECTED_VIEW;
-        receiver.repair = Some(session);
-        for entry in [old, barrier] {
-            let mut message = Message::<PrepareHeader>::new(entry.len());
-            message.as_mut_slice().copy_from_slice(entry.as_slice());
+            receiver.consensus().handle_do_view_change(
+                PlaneKind::Partitions,
+                dvc.header(),
+                &dvc.as_slice()[header_size..],
+            );
+            assert!(receiver.consensus().view_log_is_pending());
+            assert!(!receiver.consensus().is_normal());
+            let mut session = armed_session(3, 0, None);
+            session.view = ELECTED_VIEW;
+            receiver.repair = Some(session);
+            for entry in [old, barrier] {
+                let mut message = Message::<PrepareHeader>::new(entry.len());
+                message.as_mut_slice().copy_from_slice(entry.as_slice());
+                receiver.apply_repaired_prepare(message).await;
+            }
+            if receiver.persistence.is_some() {
+                assert_eq!(
+                    receiver.complete_repair(&config).await,
+                    RepairConclusion::InProgress
+                );
+                receiver
+                    .persistence
+                    .as_ref()
+                    .unwrap()
+                    .drain_with_timeout()
+                    .await
+                    .unwrap();
+            }
+            assert_eq!(
+                receiver.complete_repair(&config).await,
+                RepairConclusion::InProgress
+            );
+            assert!(
+                receiver.fatal.is_none(),
+                "repair failed under {durability:?}: {:?}",
+                receiver.fatal,
+            );
+            assert_eq!(
+                receiver.applied_purge_generation(),
+                1,
+                "durability={durability:?}"
+            );
+            assert_eq!(receiver.consensus().commit_min(), 2);
+            let mut message = Message::<PrepareHeader>::new(fresh.len());
+            message.as_mut_slice().copy_from_slice(fresh.as_slice());
             receiver.apply_repaired_prepare(message).await;
+            if receiver.persistence.is_some() {
+                assert_eq!(
+                    receiver.complete_repair(&config).await,
+                    RepairConclusion::InProgress
+                );
+                receiver
+                    .persistence
+                    .as_ref()
+                    .unwrap()
+                    .drain_with_timeout()
+                    .await
+                    .unwrap();
+            }
+            assert_eq!(
+                receiver.complete_repair(&config).await,
+                RepairConclusion::Done
+            );
+            receiver
+                .consensus()
+                .start_pending_view(PlaneKind::Partitions);
+            assert!(receiver.consensus().is_normal());
+            assert_eq!(receiver.stats.messages_count_inconsistent(), 1);
+            assert_eq!(receiver.offset.load(Ordering::Acquire), 0);
         }
-        assert_eq!(
-            receiver.complete_repair(&config).await,
-            RepairConclusion::InProgress
-        );
-        assert_eq!(receiver.applied_purge_generation(), 1);
-        assert_eq!(receiver.consensus().commit_min(), 2);
-        let mut message = Message::<PrepareHeader>::new(fresh.len());
-        message.as_mut_slice().copy_from_slice(fresh.as_slice());
-        receiver.apply_repaired_prepare(message).await;
-        assert_eq!(
-            receiver.complete_repair(&config).await,
-            RepairConclusion::Done
-        );
-        receiver
-            .consensus()
-            .start_pending_view(PlaneKind::Partitions);
-        assert!(receiver.consensus().is_normal());
-        assert_eq!(receiver.stats.messages_count_inconsistent(), 1);
-        assert_eq!(receiver.offset.load(Ordering::Acquire), 0);
     }
 
     #[compio::test]
