@@ -426,11 +426,9 @@ struct PassCounters {
     /// destroys prepares.
     parked_reclaimed: usize,
     /// Purges staged this pass. Counted so the pass does not arm the
-    /// fast-skip: the pump can DEFER a purge it could not record
-    /// (`PurgeError::FrontierNotRecorded` / `GenerationNotRecorded`), which
-    /// leaves `applied_purge_generation` unmoved and bumps no revision, so an
-    /// armed skip would swallow the only re-issue and drop a committed
-    /// `PurgeTopic` on this replica for good.
+    /// fast-skip: the pump may defer proposing the barrier until earlier
+    /// operations commit or primaryship settles. Neither changes metadata's
+    /// revision, so the proposal must be retried until the generation applies.
     purges_staged: usize,
     /// Rebuilds deferred until an in-flight `ConfirmRemove` drains. Counted
     /// so the pass does not arm the fast-skip: the pump's drop clears the

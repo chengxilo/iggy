@@ -1238,7 +1238,7 @@ impl Streams {
                 .items
                 .get(stream_id)
                 .and_then(|stream| stream.topics.get(topic_id))
-                .and_then(|topic| topic.partitions.iter().find(|p| p.id == partition_id))
+                .and_then(|topic| find_partition(&topic.partitions, partition_id))
                 .map_or(0, |partition| partition.purge_generation)
         })
     }
@@ -1791,7 +1791,8 @@ impl Streams {
         self.with_committed_partition(namespace, |partition| partition.created_view)
     }
 
-    fn with_committed_partition<T>(
+    /// Read fields from the same committed partition snapshot.
+    pub fn with_committed_partition<T>(
         &self,
         namespace: IggyNamespace,
         read: impl FnOnce(&Partition) -> T,

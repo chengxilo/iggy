@@ -7716,8 +7716,8 @@ where
     /// [`PurgeError::FrontierNotRecorded`]. Refused rather than logged: nothing
     /// has been mutated yet, and a purge that cannot record its reset must not
     /// be the one that erases the data proving the old frontier. The caller
-    /// RETRIES; it must not fence, since the chain is still whole and the live
-    /// counter still names the pre-purge space.
+    /// stops the commit walk, since later operations belong to the new offset
+    /// space. Recovery retries the same committed barrier.
     #[allow(clippy::future_not_send)]
     async fn record_purge_frontier_reset(&mut self, generation: u64) -> Result<(), PurgeError> {
         if self.reset_offset_frontier_at(0).await {
@@ -7725,24 +7725,14 @@ where
             return Ok(());
         }
         self.purge_deferred = true;
-        // The ONLY operator-visible signal for the withhold: `send_prepare_ok`
-        // returns silently, correctly, since it runs per prepare. So this line
-        // has to say that the replica is now out of quorum for this group, or
-        // the symptom reads as a network fault. The consecutive count
-        // correlates it with the superblock writer's own error log, which
-        // carries the `ENOSPC` / `EIO` cause but is rate-limited to
-        // power-of-two failures, while this deferral repeats per reconciler
-        // pass.
         warn!(
             target: "iggy.partitions.diag",
             plane = "partitions",
             namespace_raw = self.namespace().inner(),
             generation,
             superblock_write_failures = self.superblock_write_failures.get(),
-            "cannot record the purge's offset-frontier reset; deferring the purge so the \
-             durable frontier cannot outlive the data it describes. This replica now \
-             withholds PrepareOk for this partition until the purge lands, so it is \
-             quorum-invisible there; its other partitions are unaffected"
+            "cannot record the committed purge's offset-frontier reset; \
+             leaving message data intact and stopping the commit walk for recovery"
         );
         Err(PurgeError::FrontierNotRecorded)
     }
@@ -8224,7 +8214,7 @@ where
             return;
         }
         let mut next_op = session.next_op.max(floor.saturating_add(1));
-        while next_op < header.op && self.log.journal().inner.repair_header(next_op).is_some() {
+        while next_op < header.op && self.log.journal().inner.holds_repair_op(next_op) {
             next_op += 1;
         }
         if let Some(session) = self.repair.as_mut() {

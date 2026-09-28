@@ -139,9 +139,27 @@ where
         reply: Sender<PartitionReadReply>,
     ) {
         let partitions = self.plane.partitions();
+        let committed_purge = if matches!(
+            read,
+            PartitionRead::ConsumerOffset { .. } | PartitionRead::GroupOffsetState { .. }
+        ) {
+            self.plane
+                .metadata()
+                .mux_stm
+                .streams()
+                .partition_purge_generation(
+                    namespace.stream_id(),
+                    namespace.topic_id(),
+                    namespace.partition_id(),
+                )
+        } else {
+            0
+        };
         let rejected = partitions
             .with_partition(&namespace, |partition| {
-                if partition.requires_state_transfer() {
+                if partition.requires_state_transfer()
+                    || committed_purge > partition.applied_purge_generation()
+                {
                     return true;
                 }
                 if let PartitionRead::PollOnPrimary { attachment, .. } = &read {

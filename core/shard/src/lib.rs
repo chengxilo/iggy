@@ -3378,19 +3378,13 @@ where
             .metadata()
             .mux_stm
             .streams()
-            .created_revision_for_namespace(namespace);
+            .with_committed_partition(namespace, |partition| {
+                (partition.created_revision, partition.purge_generation)
+            });
         let row = self.shards_table.epoch_for(namespace);
-        if committed.is_some() && committed == row {
-            let purge_generation = self
-                .plane
-                .metadata()
-                .mux_stm
-                .streams()
-                .partition_purge_generation(
-                    namespace.stream_id(),
-                    namespace.topic_id(),
-                    namespace.partition_id(),
-                );
+        if let Some((created_revision, purge_generation)) = committed
+            && Some(created_revision) == row
+        {
             return self
                 .plane
                 .partitions()
@@ -3401,7 +3395,7 @@ where
             shard = self.id,
             namespace_raw,
             operation = ?operation,
-            committed_revision = ?committed,
+            committed_revision = ?committed.map(|(revision, _)| revision),
             row_epoch = ?row,
             "denying partition request against an unverified incarnation"
         );

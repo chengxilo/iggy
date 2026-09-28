@@ -21,6 +21,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::task::{Context, Poll, Wake};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use consensus::{
     ClientTable, MetadataHandle, PartitionsHandle, Sequencer, SessionEnd, build_reply_message_with,
@@ -369,6 +370,174 @@ async fn given_committed_purge_when_polling_should_reject_unapplied_history() {
             Some((None, None)),
             "rejected polls must not advance group progress or commit offsets"
         );
+    }
+}
+
+#[compio::test]
+async fn given_committed_purge_when_reading_offsets_should_reject_until_applied() {
+    #[derive(Debug)]
+    enum Phase {
+        Before,
+        Pending,
+        Applied,
+    }
+    const CONSUMER_ID: u32 = 1;
+    const OLD_OFFSET: u64 = 1;
+
+    for (operation, body) in [
+        (
+            Operation::PurgeTopic,
+            PurgeTopicRequest {
+                stream_id: WireIdentifier::numeric(0),
+                topic_id: WireIdentifier::numeric(0),
+            }
+            .to_bytes(),
+        ),
+        (
+            Operation::PurgeStream,
+            PurgeStreamRequest {
+                stream_id: WireIdentifier::numeric(0),
+            }
+            .to_bytes(),
+        ),
+    ] {
+        let namespace = IggyNamespace::new(0, 0, 0);
+        let bus = Rc::new(IggyMessageBus::new(0));
+        let (mut partition, config) =
+            partition_with_messages(&bus, namespace, &["old zero", "old one"]).await;
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let directory = std::env::temp_dir().join(format!(
+            "iggy-purge-offset-reads-{}-{unique}",
+            std::process::id()
+        ));
+        std::fs::create_dir(&directory).unwrap();
+        partition.set_partition_dir(directory.to_string_lossy().into_owned());
+        for consumer in [
+            WireConsumer::consumer(WireIdentifier::numeric(CONSUMER_ID)),
+            WireConsumer::consumer_group(WireIdentifier::numeric(CONSUMER_ID)),
+        ] {
+            let body = StoreConsumerOffsetRequest {
+                consumer,
+                stream_id: WireIdentifier::numeric(0),
+                topic_id: WireIdentifier::numeric(0),
+                partition_id: Some(0),
+                offset: OLD_OFFSET,
+                ack: AckLevel::Quorum,
+            }
+            .to_bytes();
+            let op = partition.consensus().sequencer().current_sequence() + 1;
+            let size = size_of::<RoutedRequestHeader>() + body.len();
+            let mut request = Message::<RoutedRequestHeader>::new(size);
+            request.as_mut_slice()[size_of::<RoutedRequestHeader>()..].copy_from_slice(&body);
+            let request = request.transmute_header::<RoutedRequestHeader>(|_, header| {
+                *header = RoutedRequestHeader {
+                    command: Command::Request,
+                    operation: Operation::StoreConsumerOffset,
+                    size: u32::try_from(size).unwrap(),
+                    cluster: 1,
+                    group: namespace.inner(),
+                    client: 1,
+                    session: 1,
+                    request: op,
+                    ..Default::default()
+                };
+            });
+            partition.on_request(request, None).await;
+            partition.consensus().advance_commit_max(op);
+            partition.commit_journal(&config).await;
+        }
+
+        let mut inner = StreamsInner::default();
+        let mut stream = Stream::default();
+        let mut topic = Topic::default();
+        topic.partitions.push(Partition::new(
+            0,
+            namespace.inner(),
+            IggyTimestamp::default(),
+            0,
+            0,
+        ));
+        stream.topics.insert(topic);
+        inner.items.insert(stream);
+        let metadata = PollTestMetadata::new((Users::default(), (inner.into(), ())));
+        let (owner, _sender) = owner_with_metadata(&bus, config.clone(), namespace, metadata);
+        owner.plane.partitions().insert(namespace, partition);
+
+        for phase in [Phase::Before, Phase::Pending, Phase::Applied] {
+            match phase {
+                Phase::Before => {}
+                Phase::Pending => apply_poll_metadata(&owner, operation, &body),
+                Phase::Applied => {
+                    let generation = owner
+                        .plane
+                        .metadata()
+                        .mux_stm
+                        .streams()
+                        .partition_purge_generation(0, 0, 0);
+                    let partition = owner.plane.partitions().get_mut_by_ns(&namespace).unwrap();
+                    let previous_op = partition.consensus().sequencer().current_sequence();
+                    partition.request_purge(generation).await;
+                    let barrier = partition.consensus().sequencer().current_sequence();
+                    assert_eq!(
+                        barrier,
+                        previous_op + 1,
+                        "the purge must propose a new barrier after the offset stores commit"
+                    );
+                    partition.consensus().advance_commit_max(barrier);
+                    partition.commit_journal(&config).await;
+                    assert!(
+                        partition.fatal().is_none(),
+                        "purge fault: {:?}",
+                        partition.fatal()
+                    );
+                    assert_eq!(partition.applied_purge_generation(), generation);
+                }
+            }
+            for read in [
+                PartitionRead::ConsumerOffset {
+                    consumer: PollingConsumer::Consumer(CONSUMER_ID as usize, 0),
+                },
+                PartitionRead::ConsumerOffset {
+                    consumer: PollingConsumer::ConsumerGroup(CONSUMER_ID as usize, 0),
+                },
+                PartitionRead::GroupOffsetState {
+                    group_id: u64::from(CONSUMER_ID),
+                },
+            ] {
+                let (reply, replies) = channel(1);
+                owner.on_partition_read(namespace, read, reply).await;
+                let result = replies.try_recv().expect("offset read must reply");
+                if matches!(phase, Phase::Pending) {
+                    assert!(
+                        matches!(
+                            result,
+                            PartitionReadReply::Rejected(IggyError::TransientNotAccepted)
+                        ),
+                        "{operation:?}: old offsets escaped a pending purge: {result:?}"
+                    );
+                    continue;
+                }
+                let expected = matches!(phase, Phase::Before).then_some(OLD_OFFSET);
+                match result {
+                    PartitionReadReply::ConsumerOffset { stored, .. } => {
+                        assert_eq!(stored, expected, "{operation:?}: {phase:?}");
+                    }
+                    PartitionReadReply::GroupOffsetState {
+                        last_polled,
+                        committed,
+                    } => {
+                        assert_eq!(last_polled, None);
+                        assert_eq!(committed, expected, "{operation:?}: {phase:?}");
+                    }
+                    other => panic!("{operation:?}: {phase:?} should serve offsets, got {other:?}"),
+                }
+            }
+        }
+        drop(owner);
+        std::fs::remove_dir_all(directory).unwrap();
     }
 }
 
